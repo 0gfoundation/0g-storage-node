@@ -22,4 +22,4 @@ On top of the log layer, 0G Storage provides a Key-Value store runtime to manage
 
 ## Dependencies
 
-The 0G Storage Node is depended by the [0G Storage KV](https://github.com/0glabs/0g-storage-kv). 0G Storage KV is essentially a wrapper layer on top of 0G Storage Node in order to provide mutable KV Store and transaction processing to applications. 0G DA uses the KV Store to store metadata of the data blobs.
+The 0G Storage Node is depended on the [0G Storage KV](https://github.com/0glabs/0g-storage-kv). 0G Storage KV is essentially a wrapper layer on top of 0G Storage Node in order to provide mutable KV Store and transaction processing to applications. 0G DA uses the KV Store to store metadata of the data blobs.
