@@ -1,3 +1,4 @@
+
 use crate::error::Error;
 use crate::log_store::log_manager::{
     data_to_merkle_leaves, sub_merkle_tree, COL_BLOCK_PROGRESS, COL_MISC, COL_TX, COL_TX_COMPLETED,
@@ -6,7 +7,7 @@ use crate::log_store::log_manager::{
 use crate::log_store::metrics;
 use crate::{try_option, LogManager, ZgsKeyValueDB};
 use anyhow::{anyhow, Result};
-use append_merkle::{AppendMerkleTree, OptionalHash, Sha3Algorithm};
+use append_merkle::{MerkleTreeRead, AppendMerkleTree, OptionalHash, Sha3Algorithm};
 use ethereum_types::H256;
 use merkle_light::merkle::log2_pow2;
 use shared_types::{DataRoot, Transaction};

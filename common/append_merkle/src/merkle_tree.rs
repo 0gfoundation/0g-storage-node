@@ -67,11 +67,7 @@ impl From<OptionalHash> for Option<H256> {
 
 impl AsRef<[u8]> for OptionalHash {
     fn as_ref(&self) -> &[u8] {
-        static ZERO_BYTES: [u8; 32] = [0u8; 32];
-        match &self.0 {
-            Some(hash) => hash.as_ref(),
-            None => &ZERO_BYTES, // Return reference to static zeros for null hash
-        }
+        self.0.as_ref().unwrap().as_ref()
     }
 }
 
