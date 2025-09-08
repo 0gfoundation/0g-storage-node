@@ -47,7 +47,7 @@ impl OptionalHash {
 
     /// Convert a Proof<OptionalHash> to Proof<H256>
     pub fn convert_proof_to_h256(proof: Proof<OptionalHash>) -> Result<Proof<H256>, anyhow::Error> {
-        let lemma: Vec<H256> = proof
+        let lemma = proof
             .lemma()
             .iter()
             .map(|oh| oh.to_h256_or_zero())
@@ -60,7 +60,7 @@ impl OptionalHash {
     pub fn convert_proof_from_h256(
         proof: Proof<H256>,
     ) -> Result<Proof<OptionalHash>, anyhow::Error> {
-        let lemma: Vec<OptionalHash> = proof
+        let lemma = proof
             .lemma()
             .iter()
             .map(|h| OptionalHash::some(*h))
@@ -101,9 +101,10 @@ impl From<OptionalHash> for Option<H256> {
 
 impl AsRef<[u8]> for OptionalHash {
     fn as_ref(&self) -> &[u8] {
+        static ZERO_BYTES: [u8; 32] = [0u8; 32];
         match &self.0 {
             Some(hash) => hash.as_ref(),
-            None => &[0u8; 32], // Return zeros for null hash
+            None => &ZERO_BYTES, // Return reference to static zeros for null hash
         }
     }
 }
@@ -123,24 +124,17 @@ impl Encode for OptionalHash {
     }
 
     fn ssz_fixed_len() -> usize {
-        33 // 1 byte for Some/None + 32 bytes for hash
+        32 // Same as H256 - just 32 bytes, no flag byte
     }
 
     fn ssz_bytes_len(&self) -> usize {
-        33
+        32
     }
 
     fn ssz_append(&self, buf: &mut Vec<u8>) {
-        match &self.0 {
-            Some(hash) => {
-                buf.push(1); // Some discriminant
-                hash.ssz_append(buf);
-            }
-            None => {
-                buf.push(0); // None discriminant
-                buf.extend_from_slice(&[0u8; 32]);
-            }
-        }
+        // Use H256::zero() for None, actual hash for Some
+        let hash = self.0.unwrap_or_else(H256::zero);
+        hash.ssz_append(buf);
     }
 }
 
@@ -150,27 +144,21 @@ impl Decode for OptionalHash {
     }
 
     fn ssz_fixed_len() -> usize {
-        33
+        32 // Same as H256
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        if bytes.len() != 33 {
+        if bytes.len() != 32 {
             return Err(ssz::DecodeError::InvalidByteLength {
                 len: bytes.len(),
-                expected: 33,
+                expected: 32,
             });
         }
 
-        match bytes[0] {
-            0 => Ok(OptionalHash::none()),
-            1 => {
-                let hash = H256::from_ssz_bytes(&bytes[1..])?;
-                Ok(OptionalHash::some(hash))
-            }
-            _ => Err(ssz::DecodeError::BytesInvalid(
-                "Invalid discriminant for OptionalHash".to_string(),
-            )),
-        }
+        let hash = H256::from_ssz_bytes(bytes)?;
+        // If it's H256::zero(), treat it as None, otherwise Some
+
+        Ok(OptionalHash::some(hash))
     }
 }
 

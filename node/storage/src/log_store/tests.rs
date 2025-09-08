@@ -27,20 +27,11 @@ fn test_put_get() {
         0,
         None,
     );
-    let padding_leaves: Vec<OptionalHash> =
-        data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1))
-            .unwrap()
-            .into_iter()
-            .map(OptionalHash::from)
-            .collect();
+    let padding_leaves = data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1)).unwrap();
     merkle.append_list(padding_leaves);
     let mut data_padded = data.clone();
     data_padded.append(&mut vec![0u8; CHUNK_SIZE]);
-    let data_leaves: Vec<OptionalHash> = data_to_merkle_leaves(&data_padded)
-        .unwrap()
-        .into_iter()
-        .map(OptionalHash::from)
-        .collect();
+    let data_leaves = data_to_merkle_leaves(&data_padded).unwrap();
     merkle.append_list(data_leaves);
     merkle.commit(Some(0));
     let tx_merkle = sub_merkle_tree(&data).unwrap();
@@ -144,11 +135,7 @@ fn test_root() {
         let mt = sub_merkle_tree(&data).unwrap();
         println!("{:?} {}", mt.root(), hex::encode(mt.root()));
         let append_mt = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
-            data_to_merkle_leaves(&data)
-                .unwrap()
-                .into_iter()
-                .map(OptionalHash::from)
-                .collect(),
+            data_to_merkle_leaves(&data).unwrap(),
             0,
             None,
         );
