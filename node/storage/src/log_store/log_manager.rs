@@ -57,9 +57,8 @@ const PAD_MAX_SIZE: usize = 1 << 20;
 
 static PAD_SEGMENT_ROOT: Lazy<OptionalHash> = Lazy::new(|| {
     let h256_leaves = data_to_merkle_leaves(&[0; ENTRY_SIZE * PORA_CHUNK_SIZE]).unwrap();
-    let optional_leaves: Vec<OptionalHash> =
-        h256_leaves.into_iter().map(OptionalHash::from).collect();
-    Merkle::new(optional_leaves, 0, None).root()
+
+    Merkle::new(h256_leaves, 0, None).root()
 });
 pub struct UpdateFlowMessage {
     pub pad_data: usize,
@@ -979,10 +978,7 @@ impl LogManager {
                 let mut completed_chunk_index = None;
                 if pad_data.len() < last_chunk_pad {
                     is_full_empty = false;
-                    let pad_leaves: Vec<OptionalHash> = data_to_merkle_leaves(&pad_data)?
-                        .into_iter()
-                        .map(OptionalHash::from)
-                        .collect();
+                    let pad_leaves = data_to_merkle_leaves(&pad_data)?;
                     merkle.last_chunk_merkle.append_list(pad_leaves);
                     merkle
                         .pora_chunks_merkle
@@ -991,11 +987,7 @@ impl LogManager {
                     if last_chunk_pad != 0 {
                         is_full_empty = false;
                         // Pad the last chunk.
-                        let last_chunk_leaves: Vec<OptionalHash> =
-                            data_to_merkle_leaves(&pad_data[..last_chunk_pad])?
-                                .into_iter()
-                                .map(OptionalHash::from)
-                                .collect();
+                        let last_chunk_leaves = data_to_merkle_leaves(&pad_data[..last_chunk_pad])?;
                         merkle.last_chunk_merkle.append_list(last_chunk_leaves);
                         merkle
                             .pora_chunks_merkle

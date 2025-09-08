@@ -54,12 +54,18 @@ impl Algorithm<H256> for Sha3Algorithm {
 impl Algorithm<OptionalHash> for Sha3Algorithm {
     fn parent(left: &OptionalHash, right: &OptionalHash) -> OptionalHash {
         match (&left.0, &right.0) {
-            (Some(l), Some(r)) => OptionalHash::some(Self::parent(l, r)),
+            (Some(l), Some(r)) => {
+                // Use the H256 implementation directly to ensure identical logic
+                let result = <Self as Algorithm<H256>>::parent(l, r);
+                OptionalHash::some(result)
+            }
             _ => OptionalHash::none(),
         }
     }
 
     fn leaf(data: &[u8]) -> OptionalHash {
-        OptionalHash::some(Self::leaf(data))
+        // Use the H256 implementation directly to ensure identical logic
+        let result = <Self as Algorithm<H256>>::leaf(data);
+        OptionalHash::some(result)
     }
 }
