@@ -85,26 +85,16 @@ fn test_put_get() {
             .unwrap();
         assert_eq!(chunk_with_proof.chunk, chunk_array.chunk_at(i).unwrap());
 
-        // Create an H256 merkle tree for proof comparison
-        let mut h256_merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(vec![], 0, None);
-        h256_merkle.append_list(
-            data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1)).unwrap(),
-        );
-        h256_merkle.append_list(data_to_merkle_leaves(&data_padded).unwrap());
-
         assert_eq!(
             chunk_with_proof.proof,
-            AppendMerkleTree::convert_proof_to_h256(
-                h256_merkle.gen_proof(i + start_offset).unwrap()
-            )
-            .unwrap()
+            merkle.gen_proof_h256(i + start_offset).unwrap()
         );
         let r = chunk_with_proof.proof.validate::<Sha3Algorithm>(
             &Sha3Algorithm::leaf(&chunk_with_proof.chunk.0),
             i + start_offset,
         );
         assert!(r.is_ok(), "proof={:?} \n r={:?}", chunk_with_proof.proof, r);
-        assert!(h256_merkle.check_root(&chunk_with_proof.proof.root().into()));
+        assert!(merkle.check_root(&chunk_with_proof.proof.root().into()));
     }
     for i in (0..chunk_count).step_by(PORA_CHUNK_SIZE / 3) {
         let end = std::cmp::min(i + PORA_CHUNK_SIZE, chunk_count);

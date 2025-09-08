@@ -6,7 +6,7 @@ use crate::log_store::log_manager::{
 use crate::log_store::metrics;
 use crate::{try_option, LogManager, ZgsKeyValueDB};
 use anyhow::{anyhow, Result};
-use append_merkle::{AppendMerkleTree, MerkleTreeRead, OptionalHash, Sha3Algorithm};
+use append_merkle::{AppendMerkleTree, OptionalHash, Sha3Algorithm};
 use ethereum_types::H256;
 use merkle_light::merkle::log2_pow2;
 use shared_types::{DataRoot, Transaction};
