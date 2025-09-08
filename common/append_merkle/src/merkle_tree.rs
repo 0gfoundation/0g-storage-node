@@ -44,40 +44,6 @@ impl OptionalHash {
     pub fn to_h256_or_zero(&self) -> H256 {
         self.0.unwrap_or_else(H256::zero)
     }
-
-    /// Convert a Proof<OptionalHash> to Proof<H256>
-    pub fn convert_proof_to_h256(proof: Proof<OptionalHash>) -> Result<Proof<H256>, anyhow::Error> {
-        let lemma = proof
-            .lemma()
-            .iter()
-            .map(|oh| oh.to_h256_or_zero())
-            .collect();
-        let path = proof.path().to_vec();
-        Proof::new(lemma, path)
-    }
-
-    /// Convert a Proof<H256> to Proof<OptionalHash>
-    pub fn convert_proof_from_h256(
-        proof: Proof<H256>,
-    ) -> Result<Proof<OptionalHash>, anyhow::Error> {
-        let lemma = proof
-            .lemma()
-            .iter()
-            .map(|h| OptionalHash::some(*h))
-            .collect();
-        let path = proof.path().to_vec();
-        Proof::new(lemma, path)
-    }
-
-    /// Convert a RangeProof<H256> to RangeProof<OptionalHash>
-    pub fn convert_range_proof_from_h256(
-        range_proof: RangeProof<H256>,
-    ) -> Result<RangeProof<OptionalHash>, anyhow::Error> {
-        Ok(RangeProof {
-            left_proof: Self::convert_proof_from_h256(range_proof.left_proof)?,
-            right_proof: Self::convert_proof_from_h256(range_proof.right_proof)?,
-        })
-    }
 }
 
 // Add From conversions for easier usage
@@ -156,8 +122,6 @@ impl Decode for OptionalHash {
         }
 
         let hash = H256::from_ssz_bytes(bytes)?;
-        // If it's H256::zero(), treat it as None, otherwise Some
-
         Ok(OptionalHash::some(hash))
     }
 }
@@ -196,7 +160,7 @@ impl HashElement for H256 {
     }
 
     fn null() -> Self {
-        H256::zero() // Use all zeros instead of 0x0101... to avoid collision
+        H256::repeat_byte(0x01)
     }
 }
 

@@ -12,7 +12,9 @@ use crate::log_store::{
 use crate::{try_option, ZgsKeyValueDB};
 use any::Any;
 use anyhow::{anyhow, bail, Result};
-use append_merkle::{MerkleTreeRead, NodeDatabase, NodeTransaction, OptionalHash};
+use append_merkle::{
+    AppendMerkleTree, MerkleTreeRead, NodeDatabase, NodeTransaction, OptionalHash,
+};
 use itertools::Itertools;
 use kvdb::DBTransaction;
 use parking_lot::RwLock;
@@ -73,7 +75,7 @@ impl FlowStore {
             )
         })?;
         let optional_proof = merkle.gen_proof(sector_index)?;
-        OptionalHash::convert_proof_to_h256(optional_proof)
+        AppendMerkleTree::convert_proof_to_h256(optional_proof)
     }
 
     pub fn delete_batch_list(&self, batch_list: &[u64]) -> Result<()> {

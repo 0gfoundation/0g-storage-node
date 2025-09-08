@@ -9,7 +9,7 @@ use crate::log_store::{
 };
 use crate::{try_option, ZgsKeyValueDB};
 use anyhow::{anyhow, bail, Result};
-use append_merkle::{Algorithm, MerkleTreeRead, OptionalHash, Sha3Algorithm};
+use append_merkle::{Algorithm, AppendMerkleTree, MerkleTreeRead, OptionalHash, Sha3Algorithm};
 use ethereum_types::H256;
 use kvdb_rocksdb::{Database, DatabaseConfig};
 use merkle_light::merkle::{log2_pow2, MerkleTree};
@@ -221,7 +221,7 @@ impl LogStoreChunkWrite for LogManager {
 
         if let Some(file_proof) = maybe_file_proof {
             // Convert H256 proof to OptionalHash proof
-            let optional_proof = OptionalHash::convert_proof_from_h256(file_proof)?;
+            let optional_proof = AppendMerkleTree::convert_proof_from_h256(file_proof)?;
             // Convert H256 merkle nodes to OptionalHash merkle nodes
             let optional_nodes: Vec<(usize, OptionalHash)> = tx
                 .merkle_nodes
@@ -431,7 +431,7 @@ impl LogStoreWrite for LogManager {
         let mut merkle = self.merkle.write();
         if valid {
             merkle.pora_chunks_merkle.fill_with_range_proof(
-                OptionalHash::convert_range_proof_from_h256(data.proof.clone())?,
+                AppendMerkleTree::convert_range_proof_from_h256(data.proof.clone())?,
             )?;
         }
         Ok(valid)
@@ -893,10 +893,10 @@ impl LogManager {
         let merkle = self.merkle.read_recursive();
         let seg_index = sector_to_segment(flow_index);
         let top_proof = match maybe_tx_seq {
-            None => OptionalHash::convert_proof_to_h256(
+            None => AppendMerkleTree::convert_proof_to_h256(
                 merkle.pora_chunks_merkle.gen_proof(seg_index)?,
             )?,
-            Some(tx_seq) => OptionalHash::convert_proof_to_h256(
+            Some(tx_seq) => AppendMerkleTree::convert_proof_to_h256(
                 merkle
                     .pora_chunks_merkle
                     .at_version(tx_seq)?
@@ -918,12 +918,12 @@ impl LogManager {
                 .gen_proof_in_batch(seg_index, flow_index as usize % PORA_CHUNK_SIZE)?
         } else {
             match maybe_tx_seq {
-                None => OptionalHash::convert_proof_to_h256(
+                None => AppendMerkleTree::convert_proof_to_h256(
                     merkle
                         .last_chunk_merkle
                         .gen_proof(flow_index as usize % PORA_CHUNK_SIZE)?,
                 )?,
-                Some(tx_version) => OptionalHash::convert_proof_to_h256(
+                Some(tx_version) => AppendMerkleTree::convert_proof_to_h256(
                     merkle
                         .last_chunk_merkle
                         .at_version(tx_version)?
@@ -1346,18 +1346,13 @@ pub fn data_to_merkle_leaves(leaf_data: &[u8]) -> Result<Vec<OptionalHash>> {
     Ok(r)
 }
 
-/// Convert Vec<OptionalHash> to Vec<H256> for compatibility with existing code
-pub fn optional_hash_to_h256_vec(optional_hashes: Vec<OptionalHash>) -> Vec<H256> {
-    optional_hashes
-        .into_iter()
-        .map(|oh| oh.to_h256_or_zero())
-        .collect()
-}
-
 /// Convenience function that combines data_to_merkle_leaves and conversion to H256
 pub fn data_to_merkle_leaves_h256(leaf_data: &[u8]) -> Result<Vec<H256>> {
     let optional_hashes = data_to_merkle_leaves(leaf_data)?;
-    Ok(optional_hash_to_h256_vec(optional_hashes))
+    Ok(optional_hashes
+        .into_iter()
+        .map(|oh| oh.to_h256_or_zero())
+        .collect())
 }
 
 pub fn bytes_to_entries(size_bytes: u64) -> u64 {

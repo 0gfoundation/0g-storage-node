@@ -94,8 +94,10 @@ fn test_put_get() {
 
         assert_eq!(
             chunk_with_proof.proof,
-            OptionalHash::convert_proof_to_h256(h256_merkle.gen_proof(i + start_offset).unwrap())
-                .unwrap()
+            AppendMerkleTree::convert_proof_to_h256(
+                h256_merkle.gen_proof(i + start_offset).unwrap()
+            )
+            .unwrap()
         );
         let r = chunk_with_proof.proof.validate::<Sha3Algorithm>(
             &Sha3Algorithm::leaf(&chunk_with_proof.chunk.0),

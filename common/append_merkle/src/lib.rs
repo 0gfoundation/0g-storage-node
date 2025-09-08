@@ -27,9 +27,7 @@ use ethereum_types::H256;
 
 impl AppendMerkleTree<OptionalHash, Sha3Algorithm> {
     /// Convert a proof of OptionalHash to a proof of H256
-    pub fn convert_proof_to_h256(
-        proof: &Proof<OptionalHash>,
-    ) -> Result<Proof<H256>, anyhow::Error> {
+    pub fn convert_proof_to_h256(proof: Proof<OptionalHash>) -> Result<Proof<H256>, anyhow::Error> {
         let lemma: Result<Vec<H256>, anyhow::Error> = proof
             .lemma()
             .iter()
@@ -43,18 +41,41 @@ impl AppendMerkleTree<OptionalHash, Sha3Algorithm> {
 
     /// Convert a range proof of OptionalHash to a range proof of H256  
     pub fn convert_range_proof_to_h256(
-        proof: &RangeProof<OptionalHash>,
+        proof: RangeProof<OptionalHash>,
     ) -> Result<RangeProof<H256>, anyhow::Error> {
         Ok(RangeProof {
-            left_proof: Self::convert_proof_to_h256(&proof.left_proof)?,
-            right_proof: Self::convert_proof_to_h256(&proof.right_proof)?,
+            left_proof: Self::convert_proof_to_h256(proof.left_proof)?,
+            right_proof: Self::convert_proof_to_h256(proof.right_proof)?,
+        })
+    }
+
+    /// Convert a Proof<H256> to Proof<OptionalHash>
+    pub fn convert_proof_from_h256(
+        proof: Proof<H256>,
+    ) -> Result<Proof<OptionalHash>, anyhow::Error> {
+        let lemma = proof
+            .lemma()
+            .iter()
+            .map(|h| OptionalHash::some(*h))
+            .collect();
+        let path = proof.path().to_vec();
+        Proof::new(lemma, path)
+    }
+
+    /// Convert a RangeProof<H256> to RangeProof<OptionalHash>
+    pub fn convert_range_proof_from_h256(
+        range_proof: RangeProof<H256>,
+    ) -> Result<RangeProof<OptionalHash>, anyhow::Error> {
+        Ok(RangeProof {
+            left_proof: Self::convert_proof_from_h256(range_proof.left_proof)?,
+            right_proof: Self::convert_proof_from_h256(range_proof.right_proof)?,
         })
     }
 
     /// Generate a proof and convert it to H256
     pub fn gen_proof_h256(&self, leaf_index: usize) -> Result<Proof<H256>, anyhow::Error> {
         let proof = self.gen_proof(leaf_index)?;
-        Self::convert_proof_to_h256(&proof)
+        Self::convert_proof_to_h256(proof)
     }
 
     /// Generate a range proof and convert it to H256
@@ -64,7 +85,7 @@ impl AppendMerkleTree<OptionalHash, Sha3Algorithm> {
         end_index: usize,
     ) -> Result<RangeProof<H256>, anyhow::Error> {
         let proof = self.gen_range_proof(start_index, end_index)?;
-        Self::convert_range_proof_to_h256(&proof)
+        Self::convert_range_proof_to_h256(proof)
     }
 
     /// Get the root as H256 (unwraps the OptionalHash)
