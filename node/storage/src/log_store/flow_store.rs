@@ -682,13 +682,13 @@ pub struct OptionalHashNodeDBTransaction(Box<dyn NodeTransaction<DataRoot>>);
 
 impl NodeTransaction<OptionalHash> for OptionalHashNodeDBTransaction {
     fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
-        self.0.save_node(layer, pos, &node.to_h256_or_zero());
+        self.0.save_node(layer, pos, &node.unwrap());
     }
 
     fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
         let h256_nodes: Vec<(usize, usize, DataRoot)> = nodes
             .iter()
-            .map(|(layer, pos, oh)| (*layer, *pos, oh.to_h256_or_zero()))
+            .map(|(layer, pos, oh)| (*layer, *pos, oh.unwrap()))
             .collect();
         let h256_node_refs: Vec<(usize, usize, &DataRoot)> = h256_nodes
             .iter()

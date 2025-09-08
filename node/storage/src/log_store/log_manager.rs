@@ -692,7 +692,7 @@ impl LogStoreRead for LogManager {
     fn get_context(&self) -> crate::error::Result<(DataRoot, u64)> {
         let merkle = self.merkle.read_recursive();
         Ok((
-            merkle.pora_chunks_merkle.root().to_h256_or_zero(),
+            merkle.pora_chunks_merkle.root().unwrap(),
             merkle.last_chunk_start_index() + merkle.last_chunk_merkle.leaves() as u64,
         ))
     }
@@ -1268,7 +1268,7 @@ impl LogManager {
         let mut to_insert_subtrees = Vec::new();
         let mut start_index = 0;
         for (subtree_height, root) in subtree_list {
-            to_insert_subtrees.push((start_index, subtree_height, root.to_h256_or_zero()));
+            to_insert_subtrees.push((start_index, subtree_height, root.unwrap()));
             start_index += 1 << (subtree_height - 1);
         }
         self.flow_store
@@ -1349,10 +1349,7 @@ pub fn data_to_merkle_leaves(leaf_data: &[u8]) -> Result<Vec<OptionalHash>> {
 /// Convenience function that combines data_to_merkle_leaves and conversion to H256
 pub fn data_to_merkle_leaves_h256(leaf_data: &[u8]) -> Result<Vec<H256>> {
     let optional_hashes = data_to_merkle_leaves(leaf_data)?;
-    Ok(optional_hashes
-        .into_iter()
-        .map(|oh| oh.to_h256_or_zero())
-        .collect())
+    Ok(optional_hashes.into_iter().map(|oh| oh.unwrap()).collect())
 }
 
 pub fn bytes_to_entries(size_bytes: u64) -> u64 {

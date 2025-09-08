@@ -40,10 +40,6 @@ impl OptionalHash {
     pub fn as_ref(&self) -> Option<&H256> {
         self.0.as_ref()
     }
-
-    pub fn to_h256_or_zero(&self) -> H256 {
-        self.0.unwrap()
-    }
 }
 
 // Add From conversions for easier usage

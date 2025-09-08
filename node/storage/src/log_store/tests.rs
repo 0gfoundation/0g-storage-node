@@ -131,7 +131,7 @@ fn test_root() {
             0,
             None,
         );
-        assert_eq!(mt.root(), append_mt.root().to_h256_or_zero().0);
+        assert_eq!(mt.root(), append_mt.root().unwrap().0);
     }
 }
 
