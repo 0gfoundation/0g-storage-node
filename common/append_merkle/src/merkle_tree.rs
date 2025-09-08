@@ -117,7 +117,7 @@ impl AsMut<[u8]> for OptionalHash {
 
 impl Encode for OptionalHash {
     fn is_ssz_fixed_len() -> bool {
-        false
+        true
     }
 
     fn ssz_fixed_len() -> usize {
@@ -144,7 +144,7 @@ impl Encode for OptionalHash {
 
 impl Decode for OptionalHash {
     fn is_ssz_fixed_len() -> bool {
-        false
+        true
     }
 
     fn ssz_fixed_len() -> usize {
