@@ -1,4 +1,4 @@
-use crate::merkle_tree::ZERO_HASHES;
+use crate::merkle_tree::{OptionalHash, ZERO_HASHES};
 use crate::{Algorithm, HashElement};
 use ethereum_types::H256;
 use once_cell::sync::Lazy;
@@ -48,5 +48,18 @@ impl Algorithm<H256> for Sha3Algorithm {
             return ZERO_HASHES[0];
         }
         Self::leaf_raw(data)
+    }
+}
+
+impl Algorithm<OptionalHash> for Sha3Algorithm {
+    fn parent(left: &OptionalHash, right: &OptionalHash) -> OptionalHash {
+        match (&left.0, &right.0) {
+            (Some(l), Some(r)) => OptionalHash::some(Self::parent(l, r)),
+            _ => OptionalHash::none(),
+        }
+    }
+
+    fn leaf(data: &[u8]) -> OptionalHash {
+        OptionalHash::some(Self::leaf(data))
     }
 }

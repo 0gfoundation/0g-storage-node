@@ -204,9 +204,9 @@ impl EntryBatch {
                 }
             }
         }
-        Ok(Some(
-            try_option!(self.to_merkle_tree(is_first_chunk)?).root(),
-        ))
+        Ok(try_option!(self.to_merkle_tree(is_first_chunk)?)
+            .root()
+            .into())
     }
 
     pub fn submit_seal_result(&mut self, answer: SealAnswer) -> Result<()> {
@@ -243,7 +243,7 @@ impl EntryBatch {
 
     pub fn to_merkle_tree(&self, is_first_chunk: bool) -> Result<Option<Merkle>> {
         let initial_leaves = if is_first_chunk {
-            vec![H256::zero()]
+            vec![H256::zero().into()]
         } else {
             vec![]
         };
@@ -256,7 +256,7 @@ impl EntryBatch {
                 );
                 merkle.append_list(data_to_merkle_leaves(&leaf_data).expect("aligned"));
             }
-            merkle.append_subtree(subtree.subtree_height, subtree.root)?;
+            merkle.append_subtree(subtree.subtree_height, subtree.root.into())?;
         }
         if merkle.leaves() != SECTORS_PER_LOAD {
             let leaf_data = try_option!(

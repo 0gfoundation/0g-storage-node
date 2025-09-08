@@ -1,9 +1,9 @@
 use crate::log_store::log_manager::{
-    data_to_merkle_leaves, sub_merkle_tree, tx_subtree_root_list_padded, LogConfig, LogManager,
-    PORA_CHUNK_SIZE,
+    data_to_merkle_leaves, data_to_merkle_leaves_h256, sub_merkle_tree,
+    tx_subtree_root_list_padded, LogConfig, LogManager, PORA_CHUNK_SIZE,
 };
 use crate::log_store::{LogStoreChunkRead, LogStoreChunkWrite, LogStoreRead, LogStoreWrite};
-use append_merkle::{Algorithm, AppendMerkleTree, MerkleTreeRead, Sha3Algorithm};
+use append_merkle::{Algorithm, AppendMerkleTree, MerkleTreeRead, OptionalHash, Sha3Algorithm};
 use ethereum_types::H256;
 use rand::random;
 use shared_types::{compute_padded_chunk_size, ChunkArray, Transaction, CHUNK_SIZE};
@@ -22,11 +22,26 @@ fn test_put_get() {
         data[i * CHUNK_SIZE] = random();
     }
     let (padded_chunks, _) = compute_padded_chunk_size(data_size);
-    let mut merkle = AppendMerkleTree::<H256, Sha3Algorithm>::new(vec![H256::zero()], 0, None);
-    merkle.append_list(data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1)).unwrap());
+    let mut merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
+        vec![OptionalHash::some(H256::zero())],
+        0,
+        None,
+    );
+    let padding_leaves: Vec<OptionalHash> =
+        data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1))
+            .unwrap()
+            .into_iter()
+            .map(OptionalHash::from)
+            .collect();
+    merkle.append_list(padding_leaves);
     let mut data_padded = data.clone();
     data_padded.append(&mut vec![0u8; CHUNK_SIZE]);
-    merkle.append_list(data_to_merkle_leaves(&data_padded).unwrap());
+    let data_leaves: Vec<OptionalHash> = data_to_merkle_leaves(&data_padded)
+        .unwrap()
+        .into_iter()
+        .map(OptionalHash::from)
+        .collect();
+    merkle.append_list(data_leaves);
     merkle.commit(Some(0));
     let tx_merkle = sub_merkle_tree(&data).unwrap();
     let tx = Transaction {
@@ -78,16 +93,25 @@ fn test_put_get() {
             .unwrap()
             .unwrap();
         assert_eq!(chunk_with_proof.chunk, chunk_array.chunk_at(i).unwrap());
+
+        // Create an H256 merkle tree for proof comparison
+        let mut h256_merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(vec![], 0, None);
+        h256_merkle.append_list(
+            data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1)).unwrap(),
+        );
+        h256_merkle.append_list(data_to_merkle_leaves(&data_padded).unwrap());
+
         assert_eq!(
             chunk_with_proof.proof,
-            merkle.gen_proof(i + start_offset).unwrap()
+            OptionalHash::convert_proof_to_h256(h256_merkle.gen_proof(i + start_offset).unwrap())
+                .unwrap()
         );
         let r = chunk_with_proof.proof.validate::<Sha3Algorithm>(
             &Sha3Algorithm::leaf(&chunk_with_proof.chunk.0),
             i + start_offset,
         );
         assert!(r.is_ok(), "proof={:?} \n r={:?}", chunk_with_proof.proof, r);
-        assert!(merkle.check_root(&chunk_with_proof.proof.root()));
+        assert!(h256_merkle.check_root(&chunk_with_proof.proof.root().into()));
     }
     for i in (0..chunk_count).step_by(PORA_CHUNK_SIZE / 3) {
         let end = std::cmp::min(i + PORA_CHUNK_SIZE, chunk_count);
@@ -102,7 +126,7 @@ fn test_put_get() {
         assert!(chunk_array_with_proof
             .proof
             .validate::<Sha3Algorithm>(
-                &data_to_merkle_leaves(&chunk_array_with_proof.chunks.data).unwrap(),
+                &data_to_merkle_leaves_h256(&chunk_array_with_proof.chunks.data).unwrap(),
                 i + start_offset
             )
             .is_ok());
@@ -119,12 +143,16 @@ fn test_root() {
         }
         let mt = sub_merkle_tree(&data).unwrap();
         println!("{:?} {}", mt.root(), hex::encode(mt.root()));
-        let append_mt = AppendMerkleTree::<H256, Sha3Algorithm>::new(
-            data_to_merkle_leaves(&data).unwrap(),
+        let append_mt = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
+            data_to_merkle_leaves(&data)
+                .unwrap()
+                .into_iter()
+                .map(OptionalHash::from)
+                .collect(),
             0,
             None,
         );
-        assert_eq!(mt.root(), append_mt.root().0);
+        assert_eq!(mt.root(), append_mt.root().to_h256_or_zero().0);
     }
 }
 
