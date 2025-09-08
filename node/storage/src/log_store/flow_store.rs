@@ -12,7 +12,7 @@ use crate::log_store::{
 use crate::{try_option, ZgsKeyValueDB};
 use any::Any;
 use anyhow::{anyhow, bail, Result};
-use append_merkle::{MerkleTreeRead, NodeDatabase, NodeTransaction};
+use append_merkle::{MerkleTreeRead, NodeDatabase, NodeTransaction, OptionalHash};
 use itertools::Itertools;
 use kvdb::DBTransaction;
 use parking_lot::RwLock;
@@ -72,7 +72,8 @@ impl FlowStore {
                 batch_index
             )
         })?;
-        merkle.gen_proof(sector_index)
+        let optional_proof = merkle.gen_proof(sector_index)?;
+        OptionalHash::convert_proof_to_h256(optional_proof)
     }
 
     pub fn delete_batch_list(&self, batch_list: &[u64]) -> Result<()> {
@@ -647,5 +648,66 @@ impl NodeTransaction<DataRoot> for NodeDBTransaction {
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
+    }
+}
+
+// Adapter implementation for OptionalHash that delegates to the H256 implementation
+impl NodeDatabase<OptionalHash> for FlowDBStore {
+    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<OptionalHash>> {
+        Ok(self.get_node(layer, pos)?.map(OptionalHash::some))
+    }
+
+    fn get_layer_size(&self, layer: usize) -> Result<Option<usize>> {
+        // Layer size is the same regardless of hash type
+        <Self as NodeDatabase<DataRoot>>::get_layer_size(self, layer)
+    }
+
+    fn start_transaction(&self) -> Box<dyn NodeTransaction<OptionalHash>> {
+        Box::new(OptionalHashNodeDBTransaction(self.start_transaction()))
+    }
+
+    fn commit(&self, tx: Box<dyn NodeTransaction<OptionalHash>>) -> Result<()> {
+        let h256_tx = tx
+            .into_any()
+            .downcast::<OptionalHashNodeDBTransaction>()
+            .map_err(|_| anyhow::anyhow!("Failed to downcast OptionalHashNodeDBTransaction"))?;
+        self.commit(h256_tx.0)
+    }
+}
+
+// Wrapper for NodeTransaction<OptionalHash> that delegates to NodeTransaction<H256>
+pub struct OptionalHashNodeDBTransaction(Box<dyn NodeTransaction<DataRoot>>);
+
+impl NodeTransaction<OptionalHash> for OptionalHashNodeDBTransaction {
+    fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
+        self.0.save_node(layer, pos, &node.to_h256_or_zero());
+    }
+
+    fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
+        let h256_nodes: Vec<(usize, usize, DataRoot)> = nodes
+            .iter()
+            .map(|(layer, pos, oh)| (*layer, *pos, oh.to_h256_or_zero()))
+            .collect();
+        let h256_node_refs: Vec<(usize, usize, &DataRoot)> = h256_nodes
+            .iter()
+            .map(|(layer, pos, h)| (*layer, *pos, h))
+            .collect();
+        self.0.save_node_list(&h256_node_refs);
+    }
+
+    fn remove_node_list(&mut self, nodes: &[(usize, usize)]) {
+        self.0.remove_node_list(nodes);
+    }
+
+    fn save_layer_size(&mut self, layer: usize, size: usize) {
+        self.0.save_layer_size(layer, size);
+    }
+
+    fn remove_layer_size(&mut self, layer: usize) {
+        self.0.remove_layer_size(layer);
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        Box::new(self)
     }
 }

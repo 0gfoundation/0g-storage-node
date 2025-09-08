@@ -2,7 +2,7 @@ mod proof;
 
 use anyhow::{anyhow, bail, Error};
 use append_merkle::{
-    AppendMerkleTree, Proof as RawProof, RangeProof as RawRangeProof, Sha3Algorithm,
+    AppendMerkleTree, OptionalHash, Proof as RawProof, RangeProof as RawRangeProof, Sha3Algorithm,
 };
 use ethereum_types::{Address, H256, U256};
 use merkle_light::merkle::MerkleTree;
@@ -32,7 +32,7 @@ pub type DataRoot = H256;
 
 pub type FlowProof = RawProof<H256>;
 pub type FlowRangeProof = RawRangeProof<H256>;
-pub type Merkle = AppendMerkleTree<H256, Sha3Algorithm>;
+pub type Merkle = AppendMerkleTree<OptionalHash, Sha3Algorithm>;
 
 // Each chunk is 32 bytes.
 pub const CHUNK_SIZE: usize = 256;
