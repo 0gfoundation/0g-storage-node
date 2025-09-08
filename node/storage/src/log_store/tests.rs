@@ -168,6 +168,7 @@ fn test_revert() {
 #[test]
 fn test_put_tx() {
     for i in 0..12 {
+        println!("{}", i);
         let chunk_count = 0xF << i;
         let mut store = create_store();
         put_tx(&mut store, chunk_count, 0);
@@ -200,7 +201,9 @@ fn put_tx(store: &mut LogManager, chunk_count: usize, seq: u64) {
         // TODO: This can come from `tx_merkle`.
         merkle_nodes,
     };
+    println!("put tx");
     store.put_tx(tx.clone()).unwrap();
+    println!("put tx done");
     for start_index in (0..chunk_count).step_by(PORA_CHUNK_SIZE) {
         let end = cmp::min((start_index + PORA_CHUNK_SIZE) * CHUNK_SIZE, data.len());
         let chunk_array = ChunkArray {
@@ -209,5 +212,6 @@ fn put_tx(store: &mut LogManager, chunk_count: usize, seq: u64) {
         };
         store.put_chunks(tx.seq, chunk_array.clone()).unwrap();
     }
+    println!("put chunks done");
     store.finalize_tx(tx.seq).unwrap();
 }

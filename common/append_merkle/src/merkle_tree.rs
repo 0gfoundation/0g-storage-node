@@ -40,6 +40,45 @@ impl OptionalHash {
     pub fn as_ref(&self) -> Option<&H256> {
         self.0.as_ref()
     }
+
+    /// Create OptionalHash from a byte slice
+    pub fn from_slice(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() != 32 {
+            return Err("Invalid byte length for H256");
+        }
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes.copy_from_slice(bytes);
+        Ok(OptionalHash::some(H256(hash_bytes)))
+    }
+
+    /// Convert to bytes for storage (33 bytes: 1 flag + 32 hash)
+    pub fn as_bytes(&self) -> [u8; 33] {
+        let mut bytes = [0u8; 33];
+        match &self.0 {
+            Some(hash) => {
+                bytes[0] = 1; // Some flag
+                bytes[1..].copy_from_slice(hash.as_ref());
+            }
+            None => {
+                bytes[0] = 0; // None flag
+                              // bytes[1..] remain zeros
+            }
+        }
+        bytes
+    }
+
+    /// Create OptionalHash from storage bytes (33 bytes)
+    pub fn from_bytes(bytes: &[u8; 33]) -> Result<Self, &'static str> {
+        match bytes[0] {
+            0 => Ok(OptionalHash::none()),
+            1 => {
+                let mut hash_bytes = [0u8; 32];
+                hash_bytes.copy_from_slice(&bytes[1..]);
+                Ok(OptionalHash::some(H256(hash_bytes)))
+            }
+            _ => Err("Invalid flag byte for OptionalHash"),
+        }
+    }
 }
 
 // Add From conversions for easier usage
@@ -82,17 +121,24 @@ impl Encode for OptionalHash {
     }
 
     fn ssz_fixed_len() -> usize {
-        32 // Same as H256 - just 32 bytes, no flag byte
+        33 // 1 byte for Some/None flag + 32 bytes for hash
     }
 
     fn ssz_bytes_len(&self) -> usize {
-        32
+        33
     }
 
     fn ssz_append(&self, buf: &mut Vec<u8>) {
-        // Use H256::zero() for None, actual hash for Some
-        let hash = self.0.unwrap();
-        hash.ssz_append(buf);
+        match &self.0 {
+            Some(hash) => {
+                buf.push(1); // Some flag
+                hash.ssz_append(buf);
+            }
+            None => {
+                buf.push(0); // None flag
+                buf.extend_from_slice(&[0u8; 32]); // Padding zeros
+            }
+        }
     }
 }
 
@@ -102,19 +148,27 @@ impl Decode for OptionalHash {
     }
 
     fn ssz_fixed_len() -> usize {
-        32 // Same as H256
+        33 // 1 byte for Some/None flag + 32 bytes for hash
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        if bytes.len() != 32 {
+        if bytes.len() != 33 {
             return Err(ssz::DecodeError::InvalidByteLength {
                 len: bytes.len(),
-                expected: 32,
+                expected: 33,
             });
         }
 
-        let hash = H256::from_ssz_bytes(bytes)?;
-        Ok(OptionalHash::some(hash))
+        match bytes[0] {
+            0 => Ok(OptionalHash::none()),
+            1 => {
+                let hash = H256::from_ssz_bytes(&bytes[1..])?;
+                Ok(OptionalHash::some(hash))
+            }
+            _ => Err(ssz::DecodeError::BytesInvalid(
+                "Invalid flag byte for OptionalHash".to_string(),
+            )),
+        }
     }
 }
 

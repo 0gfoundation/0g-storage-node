@@ -946,17 +946,24 @@ impl LogManager {
             return Ok(());
         }
         let start_time = Instant::now();
+        println!(
+            "append_subtree_list: tx_seq={} tx_start_index={} merkle_list={:?}",
+            tx_seq, tx_start_index, merkle_list
+        );
 
         self.pad_tx(tx_seq, tx_start_index, &mut *merkle)?;
 
         for (subtree_depth, subtree_root) in merkle_list {
             let subtree_size = 1 << (subtree_depth - 1);
+            println!("append new subtree to pora_chunks_merkle");
             if merkle.last_chunk_merkle.leaves() + subtree_size <= PORA_CHUNK_SIZE {
+                println!("append to last_chunk_");
                 merkle
                     .last_chunk_merkle
                     .append_subtree(subtree_depth, OptionalHash::some(subtree_root))?;
                 if merkle.last_chunk_merkle.leaves() == subtree_size {
                     // `last_chunk_merkle` was empty, so this is a new leaf in the top_tree.
+
                     merkle
                         .pora_chunks_merkle
                         .append_subtree(1, merkle.last_chunk_merkle.root())?;
@@ -972,17 +979,23 @@ impl LogManager {
                     )?;
                 }
             } else {
+                println!("append to pora_chunks_");
                 // `last_chunk_merkle` has been padded here, so a subtree should not be across
                 // the chunks boundary.
                 assert_eq!(merkle.last_chunk_merkle.leaves(), 0);
                 assert!(subtree_size >= PORA_CHUNK_SIZE);
                 merkle.pora_chunks_merkle.append_subtree(
                     subtree_depth - log2_pow2(PORA_CHUNK_SIZE),
-                    subtree_root.into(),
+                    OptionalHash::some(subtree_root),
                 )?;
             }
         }
-
+        println!(
+            "after append_subtree_list: tx_seq={} tx_start_index={} last_chunk={}",
+            tx_seq,
+            tx_start_index,
+            merkle.last_chunk_merkle.leaves()
+        );
         metrics::APPEND_SUBTREE_LIST.update_since(start_time);
         Ok(())
     }

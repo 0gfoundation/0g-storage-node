@@ -580,12 +580,12 @@ fn layer_size_key(layer: usize) -> Vec<u8> {
 
 pub struct NodeDBTransaction(DBTransaction);
 
-impl NodeDatabase<DataRoot> for FlowDBStore {
-    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<DataRoot>> {
+impl NodeDatabase<OptionalHash> for FlowDBStore {
+    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<OptionalHash>> {
         Ok(self
             .kvdb
             .get(COL_FLOW_MPT_NODES, &encode_mpt_node_key(layer, pos))?
-            .map(|v| DataRoot::from_slice(&v)))
+            .map(|v| OptionalHash::from_bytes(v.as_slice().try_into().unwrap()).unwrap()))
     }
 
     fn get_layer_size(&self, layer: usize) -> Result<Option<usize>> {
@@ -595,11 +595,11 @@ impl NodeDatabase<DataRoot> for FlowDBStore {
         }
     }
 
-    fn start_transaction(&self) -> Box<dyn NodeTransaction<DataRoot>> {
+    fn start_transaction(&self) -> Box<dyn NodeTransaction<OptionalHash>> {
         Box::new(NodeDBTransaction(self.kvdb.transaction()))
     }
 
-    fn commit(&self, tx: Box<dyn NodeTransaction<DataRoot>>) -> Result<()> {
+    fn commit(&self, tx: Box<dyn NodeTransaction<OptionalHash>>) -> Result<()> {
         let db_tx: Box<NodeDBTransaction> = tx
             .into_any()
             .downcast()
@@ -608,21 +608,21 @@ impl NodeDatabase<DataRoot> for FlowDBStore {
     }
 }
 
-impl NodeTransaction<DataRoot> for NodeDBTransaction {
-    fn save_node(&mut self, layer: usize, pos: usize, node: &DataRoot) {
+impl NodeTransaction<OptionalHash> for NodeDBTransaction {
+    fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
         self.0.put(
             COL_FLOW_MPT_NODES,
             &encode_mpt_node_key(layer, pos),
-            node.as_bytes(),
+            &node.as_bytes(),
         );
     }
 
-    fn save_node_list(&mut self, nodes: &[(usize, usize, &DataRoot)]) {
+    fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
         for (layer_index, position, data) in nodes {
             self.0.put(
                 COL_FLOW_MPT_NODES,
                 &encode_mpt_node_key(*layer_index, *position),
-                data.as_bytes(),
+                &data.as_bytes(),
             );
         }
     }
@@ -653,63 +653,63 @@ impl NodeTransaction<DataRoot> for NodeDBTransaction {
     }
 }
 
-// Adapter implementation for OptionalHash that delegates to the H256 implementation
-impl NodeDatabase<OptionalHash> for FlowDBStore {
-    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<OptionalHash>> {
-        Ok(self.get_node(layer, pos)?.map(OptionalHash::some))
-    }
+// // Adapter implementation for OptionalHash that delegates to the H256 implementation
+// impl NodeDatabase<OptionalHash> for FlowDBStore {
+//     fn get_node(&self, layer: usize, pos: usize) -> Result<Option<OptionalHash>> {
+//         Ok(self.get_node(layer, pos)?.map(OptionalHash::some))
+//     }
 
-    fn get_layer_size(&self, layer: usize) -> Result<Option<usize>> {
-        // Layer size is the same regardless of hash type
-        <Self as NodeDatabase<DataRoot>>::get_layer_size(self, layer)
-    }
+//     fn get_layer_size(&self, layer: usize) -> Result<Option<usize>> {
+//         // Layer size is the same regardless of hash type
+//         <Self as NodeDatabase<DataRoot>>::get_layer_size(self, layer)
+//     }
 
-    fn start_transaction(&self) -> Box<dyn NodeTransaction<OptionalHash>> {
-        Box::new(OptionalHashNodeDBTransaction(self.start_transaction()))
-    }
+//     fn start_transaction(&self) -> Box<dyn NodeTransaction<OptionalHash>> {
+//         Box::new(OptionalHashNodeDBTransaction(self.start_transaction()))
+//     }
 
-    fn commit(&self, tx: Box<dyn NodeTransaction<OptionalHash>>) -> Result<()> {
-        let h256_tx = tx
-            .into_any()
-            .downcast::<OptionalHashNodeDBTransaction>()
-            .map_err(|_| anyhow::anyhow!("Failed to downcast OptionalHashNodeDBTransaction"))?;
-        self.commit(h256_tx.0)
-    }
-}
+//     fn commit(&self, tx: Box<dyn NodeTransaction<OptionalHash>>) -> Result<()> {
+//         let h256_tx = tx
+//             .into_any()
+//             .downcast::<OptionalHashNodeDBTransaction>()
+//             .map_err(|_| anyhow::anyhow!("Failed to downcast OptionalHashNodeDBTransaction"))?;
+//         self.commit(h256_tx.0)
+//     }
+// }
 
-// Wrapper for NodeTransaction<OptionalHash> that delegates to NodeTransaction<H256>
-pub struct OptionalHashNodeDBTransaction(Box<dyn NodeTransaction<DataRoot>>);
+// // Wrapper for NodeTransaction<OptionalHash> that delegates to NodeTransaction<H256>
+// pub struct OptionalHashNodeDBTransaction(Box<dyn NodeTransaction<DataRoot>>);
 
-impl NodeTransaction<OptionalHash> for OptionalHashNodeDBTransaction {
-    fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
-        self.0.save_node(layer, pos, &node.unwrap());
-    }
+// impl NodeTransaction<OptionalHash> for OptionalHashNodeDBTransaction {
+//     fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
+//         self.0.save_node(layer, pos, &node.unwrap());
+//     }
 
-    fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
-        let h256_nodes: Vec<(usize, usize, DataRoot)> = nodes
-            .iter()
-            .map(|(layer, pos, oh)| (*layer, *pos, oh.unwrap()))
-            .collect();
-        let h256_node_refs: Vec<(usize, usize, &DataRoot)> = h256_nodes
-            .iter()
-            .map(|(layer, pos, h)| (*layer, *pos, h))
-            .collect();
-        self.0.save_node_list(&h256_node_refs);
-    }
+//     fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
+//         let h256_nodes: Vec<(usize, usize, DataRoot)> = nodes
+//             .iter()
+//             .map(|(layer, pos, oh)| (*layer, *pos, oh.unwrap()))
+//             .collect();
+//         let h256_node_refs: Vec<(usize, usize, &DataRoot)> = h256_nodes
+//             .iter()
+//             .map(|(layer, pos, h)| (*layer, *pos, h))
+//             .collect();
+//         self.0.save_node_list(&h256_node_refs);
+//     }
 
-    fn remove_node_list(&mut self, nodes: &[(usize, usize)]) {
-        self.0.remove_node_list(nodes);
-    }
+//     fn remove_node_list(&mut self, nodes: &[(usize, usize)]) {
+//         self.0.remove_node_list(nodes);
+//     }
 
-    fn save_layer_size(&mut self, layer: usize, size: usize) {
-        self.0.save_layer_size(layer, size);
-    }
+//     fn save_layer_size(&mut self, layer: usize, size: usize) {
+//         self.0.save_layer_size(layer, size);
+//     }
 
-    fn remove_layer_size(&mut self, layer: usize) {
-        self.0.remove_layer_size(layer);
-    }
+//     fn remove_layer_size(&mut self, layer: usize) {
+//         self.0.remove_layer_size(layer);
+//     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self)
-    }
-}
+//     fn into_any(self: Box<Self>) -> Box<dyn Any> {
+//         Box::new(self)
+//     }
+// }

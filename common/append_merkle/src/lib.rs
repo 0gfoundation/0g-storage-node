@@ -259,8 +259,11 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         }
         self.node_manager.start_transaction();
         let start_index = self.leaves();
+        println!("append_subtree_inner");
         self.append_subtree_inner(subtree_depth, subtree_root)?;
+        println!("recompute");
         self.recompute_after_append_subtree(start_index, subtree_depth - 1);
+        println!("commit");
         self.node_manager.commit();
         metrics::APPEND_SUBTREE.update_since(start_time);
 
