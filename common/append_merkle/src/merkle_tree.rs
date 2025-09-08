@@ -42,7 +42,7 @@ impl OptionalHash {
     }
 
     pub fn to_h256_or_zero(&self) -> H256 {
-        self.0.unwrap_or_else(H256::zero)
+        self.0.unwrap()
     }
 }
 
@@ -95,7 +95,7 @@ impl Encode for OptionalHash {
 
     fn ssz_append(&self, buf: &mut Vec<u8>) {
         // Use H256::zero() for None, actual hash for Some
-        let hash = self.0.unwrap_or_else(H256::zero);
+        let hash = self.0.unwrap();
         hash.ssz_append(buf);
     }
 }
