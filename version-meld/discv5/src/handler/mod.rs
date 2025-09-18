@@ -1,7 +1,7 @@
 //! Session and packet handling for the Discv5 Discovery service.
 //!
 //! The [`Handler`] is responsible for establishing and maintaining sessions with
-//! connected/discovered nodes. Each node, identified by it's [`NodeId`] is associated with a
+//! connected/discovered nodes. Each node, identified by its [`NodeId`] is associated with a
 //! `Session`. This service drives the handshakes for establishing the sessions and associated
 //! logic for sending/requesting initial connections/ENR's to/from unknown peers.
 //!
@@ -102,7 +102,7 @@ pub enum HandlerResponse {
     /// A session has been established with a node.
     ///
     /// A session is only considered established once we have received a signed ENR from the
-    /// node and received messages from it's `SocketAddr` matching it's ENR fields.
+    /// node and received messages from its `SocketAddr` matching its ENR fields.
     Established(Enr, ConnectionDirection),
 
     /// A Request has been received.
