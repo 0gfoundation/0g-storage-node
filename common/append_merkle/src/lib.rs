@@ -16,11 +16,83 @@ use tracing::{trace, warn};
 
 use crate::merkle_tree::MerkleTreeWrite;
 pub use crate::merkle_tree::{
-    Algorithm, HashElement, MerkleTreeInitialData, MerkleTreeRead, ZERO_HASHES,
+    Algorithm, HashElement, MerkleTreeInitialData, MerkleTreeRead, OptionalHash, ZERO_HASHES,
 };
 pub use crate::node_manager::{EmptyNodeDatabase, NodeDatabase, NodeManager, NodeTransaction};
 pub use proof::{Proof, RangeProof};
 pub use sha3::Sha3Algorithm;
+
+// Helper functions for converting between H256 and OptionalHash types
+use ethereum_types::H256;
+
+impl AppendMerkleTree<OptionalHash, Sha3Algorithm> {
+    /// Convert a proof of OptionalHash to a proof of H256
+    pub fn convert_proof_to_h256(proof: Proof<OptionalHash>) -> Result<Proof<H256>, anyhow::Error> {
+        let lemma: Result<Vec<H256>, anyhow::Error> = proof
+            .lemma()
+            .iter()
+            .map(|oh| {
+                oh.0.ok_or_else(|| anyhow::anyhow!("Cannot convert null OptionalHash to H256"))
+            })
+            .collect();
+
+        Proof::new(lemma?, proof.path().to_vec())
+    }
+
+    /// Convert a range proof of OptionalHash to a range proof of H256  
+    pub fn convert_range_proof_to_h256(
+        proof: RangeProof<OptionalHash>,
+    ) -> Result<RangeProof<H256>, anyhow::Error> {
+        Ok(RangeProof {
+            left_proof: Self::convert_proof_to_h256(proof.left_proof)?,
+            right_proof: Self::convert_proof_to_h256(proof.right_proof)?,
+        })
+    }
+
+    /// Convert a Proof<H256> to Proof<OptionalHash>
+    pub fn convert_proof_from_h256(
+        proof: Proof<H256>,
+    ) -> Result<Proof<OptionalHash>, anyhow::Error> {
+        let lemma = proof
+            .lemma()
+            .iter()
+            .map(|h| OptionalHash::some(*h))
+            .collect();
+        let path = proof.path().to_vec();
+        Proof::new(lemma, path)
+    }
+
+    /// Convert a RangeProof<H256> to RangeProof<OptionalHash>
+    pub fn convert_range_proof_from_h256(
+        range_proof: RangeProof<H256>,
+    ) -> Result<RangeProof<OptionalHash>, anyhow::Error> {
+        Ok(RangeProof {
+            left_proof: Self::convert_proof_from_h256(range_proof.left_proof)?,
+            right_proof: Self::convert_proof_from_h256(range_proof.right_proof)?,
+        })
+    }
+
+    /// Generate a proof and convert it to H256
+    pub fn gen_proof_h256(&self, leaf_index: usize) -> Result<Proof<H256>, anyhow::Error> {
+        let proof = self.gen_proof(leaf_index)?;
+        Self::convert_proof_to_h256(proof)
+    }
+
+    /// Generate a range proof and convert it to H256
+    pub fn gen_range_proof_h256(
+        &self,
+        start_index: usize,
+        end_index: usize,
+    ) -> Result<RangeProof<H256>, anyhow::Error> {
+        let proof = self.gen_range_proof(start_index, end_index)?;
+        Self::convert_range_proof_to_h256(proof)
+    }
+
+    /// Get the root as H256 (unwraps the OptionalHash)
+    pub fn root_h256(&self) -> H256 {
+        self.root().unwrap()
+    }
+}
 
 pub struct AppendMerkleTree<E: HashElement, A: Algorithm<E>> {
     /// Keep all the nodes in the latest version. `layers[0]` is the layer of leaves.
@@ -148,7 +220,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
 
     pub fn append(&mut self, new_leaf: E) {
         let start_time = Instant::now();
-        if new_leaf == E::null() {
+        if new_leaf.is_null() {
             // appending null is not allowed.
             return;
         }
@@ -162,7 +234,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
 
     pub fn append_list(&mut self, leaf_list: Vec<E>) {
         let start_time = Instant::now();
-        if leaf_list.contains(&E::null()) {
+        if leaf_list.iter().any(|leaf| leaf.is_null()) {
             // appending null is not allowed.
             return;
         }
@@ -181,7 +253,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
     /// TODO: Optimize to avoid storing the `null` nodes?
     pub fn append_subtree(&mut self, subtree_depth: usize, subtree_root: E) -> Result<()> {
         let start_time = Instant::now();
-        if subtree_root == E::null() {
+        if subtree_root.is_null() {
             // appending null is not allowed.
             bail!("subtree_root is null");
         }
@@ -197,7 +269,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
 
     pub fn append_subtree_list(&mut self, subtree_list: Vec<(usize, E)>) -> Result<()> {
         let start_time = Instant::now();
-        if subtree_list.iter().any(|(_, root)| root == &E::null()) {
+        if subtree_list.iter().any(|(_, root)| root.is_null()) {
             // appending null is not allowed.
             bail!("subtree_list contains null");
         }
@@ -217,7 +289,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
     /// This is needed if our merkle-tree in memory only keeps intermediate nodes instead of real leaves.
     pub fn update_last(&mut self, updated_leaf: E) {
         let start_time = Instant::now();
-        if updated_leaf == E::null() {
+        if updated_leaf.is_null() {
             // updating to null is not allowed.
             return;
         }
@@ -237,9 +309,9 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
     /// Panics if the leaf is already set and different or the index is out of range.
     /// TODO: Batch computing intermediate nodes.
     pub fn fill_leaf(&mut self, index: usize, leaf: E) {
-        if leaf == E::null() {
+        if leaf.is_null() {
             // fill leaf with null is not allowed.
-        } else if self.node(0, index) == E::null() {
+        } else if self.node(0, index).is_null() {
             self.node_manager.start_transaction();
             self.update_node(0, index, leaf);
             self.recompute_after_fill_leaves(index, index + 1);
@@ -332,7 +404,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                 // skip padding node.
                 continue;
             }
-            if self.node(i, position) == E::null() {
+            if self.node(i, position).is_null() {
                 self.update_node(i, position, data.clone());
                 updated_nodes.push((i, position, data))
             } else if self.node(i, position) != data {
@@ -357,7 +429,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         if position >= self.leaves() {
             bail!("Out of bound: position={} end={}", position, self.leaves());
         }
-        if self.node(0, position) != E::null() {
+        if !self.node(0, position).is_null() {
             Ok(Some(self.node(0, position)))
         } else {
             // The leaf hash is unknown.
@@ -472,7 +544,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                     // Note that if we are recompute a range of an existing tree,
                     // we do not need to keep these possibly null parent. This is only saved
                     // for the case of constructing a new tree from the leaves.
-                    let parent = if *left == E::null() || *right == E::null() {
+                    let parent = if left.is_null() || right.is_null() {
                         E::null()
                     } else {
                         A::parent(left, right)
@@ -483,7 +555,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                     assert_eq!(chunk.len(), 1);
                     let r = &chunk[0];
                     // Same as above.
-                    let parent = if *r == E::null() {
+                    let parent = if r.is_null() {
                         E::null()
                     } else {
                         A::parent_single(r, height + self.leaf_height)
@@ -501,8 +573,8 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                 match parent_index.cmp(&self.layer_len(height + 1)) {
                     Ordering::Less => {
                         // We do not overwrite with null.
-                        if parent != E::null() {
-                            if self.node(height + 1, parent_index) == E::null()
+                        if !parent.is_null() {
+                            if self.node(height + 1, parent_index).is_null()
                                 // The last node in a layer can be updated.
                                 || (self.node(height + 1, parent_index) != parent
                                     && parent_index == self.layer_len(height + 1) - 1)
@@ -741,7 +813,7 @@ impl<'a, E: HashElement> MerkleTreeRead for HistoryTree<'a, E> {
     type E = E;
     fn node(&self, layer: usize, index: usize) -> Self::E {
         match self.delta_nodes.get(layer, index).expect("range checked") {
-            Some(node) if *node != E::null() => node.clone(),
+            Some(node) if !node.is_null() => node.clone(),
             _ => self
                 .node_manager
                 .get_node(layer, index)
@@ -798,7 +870,7 @@ macro_rules! ensure_eq {
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle_tree::MerkleTreeRead;
+    use crate::merkle_tree::{MerkleTreeRead, OptionalHash};
 
     use crate::sha3::Sha3Algorithm;
     use crate::AppendMerkleTree;
@@ -812,21 +884,30 @@ mod tests {
             for _ in 0..entry_len {
                 data.push(H256::random());
             }
-            let mut merkle =
-                AppendMerkleTree::<H256, Sha3Algorithm>::new(vec![H256::zero()], 0, None);
-            merkle.append_list(data.clone());
+            let mut merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
+                vec![OptionalHash::some(H256::zero())],
+                0,
+                None,
+            );
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
             merkle.commit(Some(0));
             verify(&data, &mut merkle);
 
             data.push(H256::random());
-            merkle.append(*data.last().unwrap());
+            merkle.append(OptionalHash::some(*data.last().unwrap()));
             merkle.commit(Some(1));
             verify(&data, &mut merkle);
 
             for _ in 0..6 {
                 data.push(H256::random());
             }
-            merkle.append_list(data[data.len() - 6..].to_vec());
+            merkle.append_list(
+                data[data.len() - 6..]
+                    .iter()
+                    .copied()
+                    .map(OptionalHash::some)
+                    .collect(),
+            );
             merkle.commit(Some(2));
             verify(&data, &mut merkle);
         }
@@ -840,9 +921,12 @@ mod tests {
             for _ in 0..entry_len {
                 data.push(H256::random());
             }
-            let mut merkle =
-                AppendMerkleTree::<H256, Sha3Algorithm>::new(vec![H256::zero()], 0, None);
-            merkle.append_list(data.clone());
+            let mut merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
+                vec![OptionalHash::some(H256::zero())],
+                0,
+                None,
+            );
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
             merkle.commit(Some(0));
 
             for i in (0..data.len()).step_by(6) {
@@ -850,12 +934,17 @@ mod tests {
                 let range_proof = merkle.gen_range_proof(i + 1, end + 1).unwrap();
                 let mut new_data = Vec::new();
                 for _ in 0..3 {
-                    new_data.push(H256::random());
+                    new_data.push(OptionalHash::some(H256::random()));
                 }
                 merkle.append_list(new_data);
                 let seq = i as u64 / 6 + 1;
                 merkle.commit(Some(seq));
-                let r = range_proof.validate::<Sha3Algorithm>(&data[i..end], i + 1);
+                let optional_data: Vec<OptionalHash> = data[i..end]
+                    .iter()
+                    .copied()
+                    .map(OptionalHash::some)
+                    .collect();
+                let r = range_proof.validate::<Sha3Algorithm>(&optional_data, i + 1);
                 assert!(r.is_ok(), "{:?}", r);
                 merkle.fill_with_range_proof(range_proof).unwrap();
             }
@@ -865,7 +954,11 @@ mod tests {
     #[test]
     fn test_proof_at_version() {
         let n = [2, 255, 256, 257];
-        let mut merkle = AppendMerkleTree::<H256, Sha3Algorithm>::new(vec![H256::zero()], 0, None);
+        let mut merkle = AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new(
+            vec![OptionalHash::some(H256::zero())],
+            0,
+            None,
+        );
         let mut start_pos = 0;
 
         for (tx_seq, &entry_len) in n.iter().enumerate() {
@@ -873,7 +966,7 @@ mod tests {
             for _ in 0..entry_len {
                 data.push(H256::random());
             }
-            merkle.append_list(data.clone());
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
             merkle.commit(Some(tx_seq as u64));
             for i in (0..data.len()).step_by(6) {
                 let end = std::cmp::min(start_pos + i + 3, data.len());
@@ -882,7 +975,12 @@ mod tests {
                     .unwrap()
                     .gen_range_proof(start_pos + i + 1, start_pos + end + 1)
                     .unwrap();
-                let r = range_proof.validate::<Sha3Algorithm>(&data[i..end], start_pos + i + 1);
+                let optional_data: Vec<OptionalHash> = data[i..end]
+                    .iter()
+                    .copied()
+                    .map(OptionalHash::some)
+                    .collect();
+                let r = range_proof.validate::<Sha3Algorithm>(&optional_data, start_pos + i + 1);
                 assert!(r.is_ok(), "{:?}", r);
                 merkle.fill_with_range_proof(range_proof).unwrap();
             }
@@ -891,16 +989,21 @@ mod tests {
         }
     }
 
-    fn verify(data: &[H256], merkle: &mut AppendMerkleTree<H256, Sha3Algorithm>) {
+    fn verify(data: &[H256], merkle: &mut AppendMerkleTree<OptionalHash, Sha3Algorithm>) {
         for (i, item) in data.iter().enumerate() {
             let proof = merkle.gen_proof(i + 1).unwrap();
-            let r = merkle.validate(&proof, item, i + 1);
+            let r = merkle.validate(&proof, &OptionalHash::some(*item), i + 1);
             assert!(matches!(r, Ok(true)), "{:?}", r);
         }
         for i in (0..data.len()).step_by(6) {
             let end = std::cmp::min(i + 3, data.len());
             let range_proof = merkle.gen_range_proof(i + 1, end + 1).unwrap();
-            let r = range_proof.validate::<Sha3Algorithm>(&data[i..end], i + 1);
+            let optional_data: Vec<OptionalHash> = data[i..end]
+                .iter()
+                .copied()
+                .map(OptionalHash::some)
+                .collect();
+            let r = range_proof.validate::<Sha3Algorithm>(&optional_data, i + 1);
             assert!(r.is_ok(), "{:?}", r);
             merkle.fill_with_range_proof(range_proof).unwrap();
         }

@@ -6,7 +6,7 @@ use crate::log_store::log_manager::{
 use crate::log_store::metrics;
 use crate::{try_option, LogManager, ZgsKeyValueDB};
 use anyhow::{anyhow, Result};
-use append_merkle::{AppendMerkleTree, MerkleTreeRead, Sha3Algorithm};
+use append_merkle::{AppendMerkleTree, MerkleTreeRead, OptionalHash, Sha3Algorithm};
 use ethereum_types::H256;
 use merkle_light::merkle::log2_pow2;
 use shared_types::{DataRoot, Transaction};
@@ -329,7 +329,7 @@ impl TransactionStore {
         &self,
         pora_chunk_index: usize,
         mut tx_seq: u64,
-    ) -> Result<AppendMerkleTree<H256, Sha3Algorithm>> {
+    ) -> Result<AppendMerkleTree<OptionalHash, Sha3Algorithm>> {
         let last_chunk_start_index = pora_chunk_index as u64 * PORA_CHUNK_SIZE as u64;
         let mut tx_list = Vec::new();
         // Find the first tx within the last chunk.
@@ -384,9 +384,13 @@ impl TransactionStore {
         }
         let mut merkle = if last_chunk_start_index == 0 {
             // The first entry hash is initialized as zero.
-            AppendMerkleTree::<H256, Sha3Algorithm>::new_with_depth(vec![H256::zero()], 1, None)
+            AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new_with_depth(
+                vec![H256::zero().into()],
+                1,
+                None,
+            )
         } else {
-            AppendMerkleTree::<H256, Sha3Algorithm>::new_with_depth(
+            AppendMerkleTree::<OptionalHash, Sha3Algorithm>::new_with_depth(
                 vec![],
                 log2_pow2(PORA_CHUNK_SIZE) + 1,
                 None,
@@ -400,9 +404,12 @@ impl TransactionStore {
                     cmp::min(first_subtree, PORA_CHUNK_SIZE) - (merkle.leaves() % first_subtree);
                 merkle.append_list(data_to_merkle_leaves(&LogManager::padding_raw(pad_len))?);
             }
-            // Since we are building the last merkle with a given last tx_seq, it's ensured
-            // that appending subtrees will not go beyond the max size.
-            merkle.append_subtree_list(subtree_list)?;
+            // Convert H256 to OptionalHash for append_subtree_list
+            let subtree_list_optional_hash = subtree_list
+                .into_iter()
+                .map(|(depth, hash)| (depth, hash.into()))
+                .collect();
+            merkle.append_subtree_list(subtree_list_optional_hash)?;
             merkle.commit(Some(tx_seq));
         }
         Ok(merkle)

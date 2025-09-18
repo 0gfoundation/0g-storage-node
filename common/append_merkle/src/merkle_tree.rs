@@ -8,6 +8,173 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use tracing::trace;
 
+/// A wrapper around Option<H256> that properly handles null hashes
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct OptionalHash(pub Option<H256>);
+
+impl OptionalHash {
+    pub fn some(hash: H256) -> Self {
+        OptionalHash(Some(hash))
+    }
+
+    pub fn none() -> Self {
+        OptionalHash(None)
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.0.is_some()
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.0.is_none()
+    }
+
+    pub fn unwrap(&self) -> H256 {
+        self.0.unwrap()
+    }
+
+    pub fn unwrap_or(&self, default: H256) -> H256 {
+        self.0.unwrap_or(default)
+    }
+
+    pub fn as_ref(&self) -> Option<&H256> {
+        self.0.as_ref()
+    }
+
+    /// Create OptionalHash from a byte slice
+    pub fn from_slice(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() != 32 {
+            return Err("Invalid byte length for H256");
+        }
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes.copy_from_slice(bytes);
+        Ok(OptionalHash::some(H256(hash_bytes)))
+    }
+
+    /// Convert to bytes for storage (33 bytes: 1 flag + 32 hash)
+    pub fn as_bytes(&self) -> [u8; 33] {
+        let mut bytes = [0u8; 33];
+        match &self.0 {
+            Some(hash) => {
+                bytes[0] = 1; // Some flag
+                bytes[1..].copy_from_slice(hash.as_ref());
+            }
+            None => {
+                bytes[0] = 0; // None flag
+                              // bytes[1..] remain zeros
+            }
+        }
+        bytes
+    }
+
+    /// Create OptionalHash from storage bytes (33 bytes)
+    pub fn from_bytes(bytes: &[u8; 33]) -> Result<Self, &'static str> {
+        match bytes[0] {
+            0 => Ok(OptionalHash::none()),
+            1 => {
+                let mut hash_bytes = [0u8; 32];
+                hash_bytes.copy_from_slice(&bytes[1..]);
+                Ok(OptionalHash::some(H256(hash_bytes)))
+            }
+            _ => Err("Invalid flag byte for OptionalHash"),
+        }
+    }
+}
+
+// Add From conversions for easier usage
+impl From<H256> for OptionalHash {
+    fn from(hash: H256) -> Self {
+        OptionalHash::some(hash)
+    }
+}
+
+impl From<Option<H256>> for OptionalHash {
+    fn from(opt: Option<H256>) -> Self {
+        OptionalHash(opt)
+    }
+}
+
+impl From<OptionalHash> for Option<H256> {
+    fn from(opt_hash: OptionalHash) -> Self {
+        opt_hash.0
+    }
+}
+
+impl AsRef<[u8]> for OptionalHash {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref().unwrap().as_ref()
+    }
+}
+
+impl AsMut<[u8]> for OptionalHash {
+    fn as_mut(&mut self) -> &mut [u8] {
+        if self.0.is_none() {
+            self.0 = Some(H256::zero());
+        }
+        self.0.as_mut().unwrap().as_mut()
+    }
+}
+
+impl Encode for OptionalHash {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        33 // 1 byte for Some/None flag + 32 bytes for hash
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        33
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        match &self.0 {
+            Some(hash) => {
+                buf.push(1); // Some flag
+                hash.ssz_append(buf);
+            }
+            None => {
+                buf.push(0); // None flag
+                buf.extend_from_slice(&[0u8; 32]); // Padding zeros
+            }
+        }
+    }
+}
+
+impl Decode for OptionalHash {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        33 // 1 byte for Some/None flag + 32 bytes for hash
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        if bytes.len() != 33 {
+            return Err(ssz::DecodeError::InvalidByteLength {
+                len: bytes.len(),
+                expected: 33,
+            });
+        }
+
+        match bytes[0] {
+            0 => Ok(OptionalHash::none()),
+            1 => {
+                let hash = H256::from_ssz_bytes(&bytes[1..])?;
+                Ok(OptionalHash::some(hash))
+            }
+            _ => Err(ssz::DecodeError::BytesInvalid(
+                "Invalid flag byte for OptionalHash".to_string(),
+            )),
+        }
+    }
+}
+
+unsafe impl Send for OptionalHash {}
+unsafe impl Sync for OptionalHash {}
+
 pub trait HashElement:
     Clone + Debug + Eq + Hash + AsRef<[u8]> + AsMut<[u8]> + Decode + Encode + Send + Sync
 {
@@ -18,13 +185,28 @@ pub trait HashElement:
     }
 }
 
+impl HashElement for OptionalHash {
+    fn end_pad(height: usize) -> Self {
+        OptionalHash::some(ZERO_HASHES[height])
+    }
+
+    fn null() -> Self {
+        OptionalHash::none()
+    }
+
+    fn is_null(&self) -> bool {
+        self.is_none()
+    }
+}
+
+// Keep the H256 implementation for backward compatibility
 impl HashElement for H256 {
     fn end_pad(height: usize) -> Self {
         ZERO_HASHES[height]
     }
 
     fn null() -> Self {
-        H256::repeat_byte(1)
+        H256::repeat_byte(0x01)
     }
 }
 
@@ -70,7 +252,7 @@ pub trait MerkleTreeRead {
                 self.leaves()
             );
         }
-        if self.node(0, leaf_index) == Self::E::null() {
+        if self.node(0, leaf_index).is_null() {
             bail!("Not ready to generate proof for leaf_index={}", leaf_index);
         }
         if self.height() == 1 {
@@ -102,7 +284,7 @@ pub trait MerkleTreeRead {
             index_in_layer >>= 1;
         }
         lemma.push(self.root());
-        if lemma.contains(&Self::E::null()) {
+        if lemma.iter().any(|e| e.is_null()) {
             bail!(
                 "Not enough data to generate proof, lemma={:?} path={:?}",
                 lemma,

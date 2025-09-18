@@ -31,6 +31,7 @@ jobs:
     - name: Checkout sources
       uses: actions/checkout@v5
       with:
+        persist-credentials: false   # prevents writing the extraheader
         submodules: recursive
 
     - name: Setup Rust (cache & toolchain)

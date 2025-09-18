@@ -12,7 +12,9 @@ use crate::log_store::{
 use crate::{try_option, ZgsKeyValueDB};
 use any::Any;
 use anyhow::{anyhow, bail, Result};
-use append_merkle::{MerkleTreeRead, NodeDatabase, NodeTransaction};
+use append_merkle::{
+    AppendMerkleTree, MerkleTreeRead, NodeDatabase, NodeTransaction, OptionalHash,
+};
 use itertools::Itertools;
 use kvdb::DBTransaction;
 use parking_lot::RwLock;
@@ -72,7 +74,8 @@ impl FlowStore {
                 batch_index
             )
         })?;
-        merkle.gen_proof(sector_index)
+        let optional_proof = merkle.gen_proof(sector_index)?;
+        AppendMerkleTree::convert_proof_to_h256(optional_proof)
     }
 
     pub fn delete_batch_list(&self, batch_list: &[u64]) -> Result<()> {
@@ -577,12 +580,12 @@ fn layer_size_key(layer: usize) -> Vec<u8> {
 
 pub struct NodeDBTransaction(DBTransaction);
 
-impl NodeDatabase<DataRoot> for FlowDBStore {
-    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<DataRoot>> {
+impl NodeDatabase<OptionalHash> for FlowDBStore {
+    fn get_node(&self, layer: usize, pos: usize) -> Result<Option<OptionalHash>> {
         Ok(self
             .kvdb
             .get(COL_FLOW_MPT_NODES, &encode_mpt_node_key(layer, pos))?
-            .map(|v| DataRoot::from_slice(&v)))
+            .map(|v| OptionalHash::from_bytes(v.as_slice().try_into().unwrap()).unwrap()))
     }
 
     fn get_layer_size(&self, layer: usize) -> Result<Option<usize>> {
@@ -592,11 +595,11 @@ impl NodeDatabase<DataRoot> for FlowDBStore {
         }
     }
 
-    fn start_transaction(&self) -> Box<dyn NodeTransaction<DataRoot>> {
+    fn start_transaction(&self) -> Box<dyn NodeTransaction<OptionalHash>> {
         Box::new(NodeDBTransaction(self.kvdb.transaction()))
     }
 
-    fn commit(&self, tx: Box<dyn NodeTransaction<DataRoot>>) -> Result<()> {
+    fn commit(&self, tx: Box<dyn NodeTransaction<OptionalHash>>) -> Result<()> {
         let db_tx: Box<NodeDBTransaction> = tx
             .into_any()
             .downcast()
@@ -605,21 +608,21 @@ impl NodeDatabase<DataRoot> for FlowDBStore {
     }
 }
 
-impl NodeTransaction<DataRoot> for NodeDBTransaction {
-    fn save_node(&mut self, layer: usize, pos: usize, node: &DataRoot) {
+impl NodeTransaction<OptionalHash> for NodeDBTransaction {
+    fn save_node(&mut self, layer: usize, pos: usize, node: &OptionalHash) {
         self.0.put(
             COL_FLOW_MPT_NODES,
             &encode_mpt_node_key(layer, pos),
-            node.as_bytes(),
+            &node.as_bytes(),
         );
     }
 
-    fn save_node_list(&mut self, nodes: &[(usize, usize, &DataRoot)]) {
+    fn save_node_list(&mut self, nodes: &[(usize, usize, &OptionalHash)]) {
         for (layer_index, position, data) in nodes {
             self.0.put(
                 COL_FLOW_MPT_NODES,
                 &encode_mpt_node_key(*layer_index, *position),
-                data.as_bytes(),
+                &data.as_bytes(),
             );
         }
     }
