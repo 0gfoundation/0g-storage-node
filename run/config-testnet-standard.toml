@@ -101,7 +101,7 @@ log_sync_start_block_number = 595059
 # The number of retries after a RPC request times out.
 # rate_limit_retries = 100
 
-# The nubmer of retries for rate limited responses.
+# The number of retries for rate limited responses.
 # timeout_retries = 100
 
 # The duration to wait before retry, in ms.
