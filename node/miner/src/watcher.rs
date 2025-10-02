@@ -26,6 +26,10 @@ pub type MineContextMessage = Option<PoraPuzzle>;
 lazy_static! {
     pub static ref EMPTY_HASH: H256 =
         H256::from_str("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").unwrap();
+    pub static ref COMPUTE_WORKER_CONTEXT_CALLER: Address =
+        "0x000000000000000000000000000000000000000A"
+            .parse()
+            .unwrap();
 }
 
 const PORA_VERSION: u64 = 1;
@@ -139,6 +143,8 @@ impl MineContextWatcher {
         }
 
         let miner_id = self.miner_id.0;
+
+        // Use eth_call with specific caller address for read-only access
         let WorkerContext {
             context,
             pora_target,
@@ -147,6 +153,7 @@ impl MineContextWatcher {
         } = self
             .mine_contract
             .compute_worker_context(miner_id)
+            .from(*COMPUTE_WORKER_CONTEXT_CALLER)
             .call()
             .await
             .map_err(|e| format!("Failed to query mining context: {:?}", e))?;
