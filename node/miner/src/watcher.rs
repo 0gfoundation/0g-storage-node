@@ -139,6 +139,12 @@ impl MineContextWatcher {
         }
 
         let miner_id = self.miner_id.0;
+
+        // Use eth_call with specific caller address for read-only access
+        let compute_caller: Address = "0x000000000000000000000000000000000000000A"
+            .parse()
+            .map_err(|e| format!("Invalid compute caller address: {:?}", e))?;
+
         let WorkerContext {
             context,
             pora_target,
@@ -147,6 +153,7 @@ impl MineContextWatcher {
         } = self
             .mine_contract
             .compute_worker_context(miner_id)
+            .from(compute_caller)
             .call()
             .await
             .map_err(|e| format!("Failed to query mining context: {:?}", e))?;
