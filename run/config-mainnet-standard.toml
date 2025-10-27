@@ -33,7 +33,7 @@
 
 # List of nodes to bootstrap UDP discovery. Note, `network_enr_address` should be
 # configured as well to enable UDP discovery.
-network_boot_nodes = ["/ip4/136.118.67.12/udp/1234/p2p/16Uiu2HAmG81UgZ1JJLx9T2HqELgJNP36ChHzYkCdA9HdxvAbb5jQ","/ip4/136.117.5.50/udp/1234/p2p/16Uiu2HAmL3DoA7e7mbxs7CkeCPtNrAcfJFFtLpJDr2HWuR6QwJ8k"]
+network_boot_nodes = ["/ip4/136.118.67.12/udp/1234/p2p/16Uiu2HAkzAFu5eNS4vt3SXkMSCYSEkQ9Gcnu5MZnyy4LXQ8ki6f7","/ip4/136.117.5.50/udp/1234/p2p/16Uiu2HAmLayW5kas3XLgxRPeJBRxVnhoqG4WayLd7FHfGbUezqXm"]
 
 # List of libp2p nodes to initially connect to.
 # network_libp2p_nodes = []
