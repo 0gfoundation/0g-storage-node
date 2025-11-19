@@ -1157,8 +1157,8 @@ impl LogManager {
         let (segments_for_proof, last_segment_size_for_proof) =
             compute_segment_size(chunks, PORA_CHUNK_SIZE);
         debug!(
-            "segments_for_proof: {}, last_segment_size_for_proof: {}",
-            segments_for_proof, last_segment_size_for_proof
+            "tx seq: {}, segments_for_proof: {}, last_segment_size_for_proof: {}",
+            tx.seq, segments_for_proof, last_segment_size_for_proof
         );
 
         let chunks_for_file = bytes_to_entries(tx.size) as usize;
@@ -1169,6 +1169,13 @@ impl LogManager {
             segments_for_file, last_segment_size_for_file
         );
 
+        // Padding should only start after real data ends
+        let real_data_end_index = (segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file;
+        debug!(
+            "Padding: real_data_end_index={}, padding_start_segment={}, padding_start_offset={}",
+            real_data_end_index, segments_for_file - 1, last_segment_size_for_file
+        );
+
         while segments_for_file <= segments_for_proof {
             let padding_size = if segments_for_file == segments_for_proof {
                 (last_segment_size_for_proof - last_segment_size_for_file) * ENTRY_SIZE
@@ -1176,7 +1183,14 @@ impl LogManager {
                 (PORA_CHUNK_SIZE - last_segment_size_for_file) * ENTRY_SIZE
             };
 
-            debug!("Padding size: {}", padding_size);
+            let padding_start_index = ((segments_for_file - 1) * PORA_CHUNK_SIZE
+                + last_segment_size_for_file) as u64;
+
+            debug!(
+                "Padding iteration: segment={}, offset={}, padding_size={}, start_index={}",
+                segments_for_file - 1, last_segment_size_for_file, padding_size, padding_start_index
+            );
+
             if padding_size > 0 {
                 // This tx hash is guaranteed to be consistent.
                 self.put_chunks_with_tx_hash(
@@ -1184,9 +1198,7 @@ impl LogManager {
                     tx.hash(),
                     ChunkArray {
                         data: vec![0u8; padding_size],
-                        start_index: ((segments_for_file - 1) * PORA_CHUNK_SIZE
-                            + last_segment_size_for_file)
-                            as u64,
+                        start_index: padding_start_index,
                     },
                     None,
                 )?;
