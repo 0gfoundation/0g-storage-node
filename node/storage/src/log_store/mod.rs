@@ -1,5 +1,6 @@
 use crate::config::ShardConfig;
 
+use append_merkle::OptionalHash;
 use ethereum_types::H256;
 use flow_store::PadPair;
 use shared_types::{
@@ -29,6 +30,8 @@ pub mod tx_store;
 pub trait LogStoreRead: LogStoreChunkRead {
     /// Get a transaction by its global log sequence number.
     fn get_tx_by_seq_number(&self, seq: u64) -> Result<Option<Transaction>>;
+
+    fn get_node_hash_by_index(&self, index:u64) -> Result<OptionalHash>;
 
     /// Get a transaction by the data root of its data.
     /// If all txs are not finalized, return the first one if need available is false.

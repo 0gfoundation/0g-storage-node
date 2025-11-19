@@ -225,6 +225,19 @@ impl RpcServer for RpcServerImpl {
         Ok(proof.right_proof)
     }
 
+    async fn get_hash_at_node_index(
+        &self,
+        node_index: u64,
+    ) -> RpcResult<Option<H256>> {
+        debug!(%node_index, "zgs_getHashAtNodeIndex");
+        let hash = self
+            .ctx
+            .log_store
+            .get_node_hash_by_index(node_index)
+            .await?;
+        Ok(hash.0)
+    }
+
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)> {
         Ok(self.ctx.log_store.get_context().await?)
     }

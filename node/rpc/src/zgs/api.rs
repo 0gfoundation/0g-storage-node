@@ -82,6 +82,12 @@ pub trait Rpc {
         flow_root: Option<DataRoot>,
     ) -> RpcResult<FlowProof>;
 
+    #[method(name = "getHashAtNodeIndex")]
+    async fn get_hash_at_node_index(
+        &self,
+        node_index: u64,
+    ) -> RpcResult<Option<H256>>;
+
     #[method(name = "getFlowContext")]
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)>;
 }

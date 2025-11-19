@@ -309,6 +309,8 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
     /// Panics if the leaf is already set and different or the index is out of range.
     /// TODO: Batch computing intermediate nodes.
     pub fn fill_leaf(&mut self, index: usize, leaf: E) {
+        // print node leaf at 12288 index
+        
         if leaf.is_null() {
             // fill leaf with null is not allowed.
         } else if self.node(0, index).is_null() {
@@ -423,6 +425,10 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
 
     pub fn check_root(&self, root: &E) -> bool {
         self.root_to_tx_seq_map.contains_key(root)
+    }
+
+    pub fn get_node_hash_by_index(&self, index: usize) -> Result<Option<E>> {
+        Ok(Some(self.node(0, index)))
     }
 
     pub fn leaf_at(&self, position: usize) -> Result<Option<E>> {

@@ -564,6 +564,14 @@ impl LogStoreRead for LogManager {
         self.tx_store.get_tx_by_seq_number(seq)
     }
 
+    fn get_node_hash_by_index(&self, index:u64) -> crate::error::Result<OptionalHash> {
+        let merkle = self.merkle.read();
+        let opt = merkle
+            .pora_chunks_merkle
+            .get_node_hash_by_index(index as usize)?;
+        opt.ok_or_else(|| anyhow!("node hash not found at index {}", index))
+    }
+
     fn get_tx_seq_by_data_root(
         &self,
         data_root: &DataRoot,
@@ -1115,7 +1123,9 @@ impl LogManager {
                 .pora_chunks_merkle
                 .update_last(merkle.last_chunk_merkle.root());
         }
+        
         let chunk_roots = self.flow_store.append_entries(flow_entry_array)?;
+        debug!("fill leaf for pora_chunks_merkle");
         for (chunk_index, chunk_root) in chunk_roots {
             if chunk_index < merkle.pora_chunks_merkle.leaves() as u64 {
                 merkle

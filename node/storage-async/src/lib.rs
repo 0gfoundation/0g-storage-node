@@ -10,6 +10,7 @@ use std::sync::Arc;
 use storage::{error, error::Result, log_store::Store as LogStore, H256};
 use task_executor::TaskExecutor;
 use tokio::sync::oneshot;
+use append_merkle::OptionalHash;
 
 pub use storage::config::ShardConfig;
 use storage::log_store::config::ConfigurableExt;
@@ -57,6 +58,7 @@ impl Store {
     delegate!(fn prune_tx(tx_seq: u64) -> Result<()>);
     delegate!(fn finalize_tx_with_hash(tx_seq: u64, tx_hash: H256) -> Result<bool>);
     delegate!(fn get_proof_at_root(root: Option<DataRoot>, index: u64, length: u64) -> Result<FlowRangeProof>);
+    delegate!(fn get_node_hash_by_index(index: u64) -> Result<OptionalHash>);
     delegate!(fn get_context() -> Result<(DataRoot, u64)>);
 
     pub async fn get_tx_seq_by_data_root(
