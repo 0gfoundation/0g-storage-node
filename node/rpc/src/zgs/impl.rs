@@ -225,10 +225,7 @@ impl RpcServer for RpcServerImpl {
         Ok(proof.right_proof)
     }
 
-    async fn get_hash_at_node_index(
-        &self,
-        node_index: u64,
-    ) -> RpcResult<Option<H256>> {
+    async fn get_hash_at_node_index(&self, node_index: u64) -> RpcResult<Option<H256>> {
         debug!(%node_index, "zgs_getHashAtNodeIndex");
         let hash = self
             .ctx

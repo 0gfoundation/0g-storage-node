@@ -564,11 +564,9 @@ impl LogStoreRead for LogManager {
         self.tx_store.get_tx_by_seq_number(seq)
     }
 
-    fn get_node_hash_by_index(&self, index:u64) -> crate::error::Result<OptionalHash> {
+    fn get_node_hash_by_index(&self, index: u64) -> crate::error::Result<OptionalHash> {
         let merkle = self.merkle.read();
-        let opt = merkle
-            .pora_chunks_merkle
-            .get_node_hash_by_index(index as usize)?;
+        let opt = merkle.pora_chunks_merkle.leaf_at(index as usize)?;
         opt.ok_or_else(|| anyhow!("node hash not found at index {}", index))
     }
 
@@ -1123,7 +1121,7 @@ impl LogManager {
                 .pora_chunks_merkle
                 .update_last(merkle.last_chunk_merkle.root());
         }
-        
+
         let chunk_roots = self.flow_store.append_entries(flow_entry_array)?;
         debug!("fill leaf for pora_chunks_merkle");
         for (chunk_index, chunk_root) in chunk_roots {
@@ -1180,10 +1178,13 @@ impl LogManager {
         );
 
         // Padding should only start after real data ends
-        let real_data_end_index = (segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file;
+        let real_data_end_index =
+            (segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file;
         debug!(
             "Padding: real_data_end_index={}, padding_start_segment={}, padding_start_offset={}",
-            real_data_end_index, segments_for_file - 1, last_segment_size_for_file
+            real_data_end_index,
+            segments_for_file - 1,
+            last_segment_size_for_file
         );
 
         while segments_for_file <= segments_for_proof {
@@ -1193,12 +1194,15 @@ impl LogManager {
                 (PORA_CHUNK_SIZE - last_segment_size_for_file) * ENTRY_SIZE
             };
 
-            let padding_start_index = ((segments_for_file - 1) * PORA_CHUNK_SIZE
-                + last_segment_size_for_file) as u64;
+            let padding_start_index =
+                ((segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file) as u64;
 
             debug!(
                 "Padding iteration: segment={}, offset={}, padding_size={}, start_index={}",
-                segments_for_file - 1, last_segment_size_for_file, padding_size, padding_start_index
+                segments_for_file - 1,
+                last_segment_size_for_file,
+                padding_size,
+                padding_start_index
             );
 
             if padding_size > 0 {

@@ -2,6 +2,7 @@
 extern crate tracing;
 
 use anyhow::bail;
+use append_merkle::OptionalHash;
 use shared_types::{
     Chunk, ChunkArray, ChunkArrayWithProof, DataRoot, FlowProof, FlowRangeProof, Transaction,
 };
@@ -10,7 +11,6 @@ use std::sync::Arc;
 use storage::{error, error::Result, log_store::Store as LogStore, H256};
 use task_executor::TaskExecutor;
 use tokio::sync::oneshot;
-use append_merkle::OptionalHash;
 
 pub use storage::config::ShardConfig;
 use storage::log_store::config::ConfigurableExt;
