@@ -278,6 +278,11 @@ impl FlowWrite for FlowStore {
             batch_list.push((chunk_index, batch));
         }
 
+        // print which indexes are being pushed to batch_list
+        for (chunk_index, _) in &batch_list {
+            debug!("Preparing to insert chunk at index: {}", chunk_index);
+        }
+
         metrics::APPEND_ENTRIES.update_since(start_time);
         let res = self.data_db.put_entry_batch_list(batch_list);
 
