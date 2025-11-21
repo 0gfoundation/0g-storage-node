@@ -238,6 +238,25 @@ impl RpcServer for RpcServerImpl {
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)> {
         Ok(self.ctx.log_store.get_context().await?)
     }
+
+    async fn get_chunk_by_index(&self, chunk_index: u64) -> RpcResult<Option<Vec<u8>>> {
+        debug!(%chunk_index, "zgs_getChunkByIndex");
+        match self
+            .ctx
+            .log_store
+            .get_chunk_by_flow_index(chunk_index, 1)
+            .await?
+        {
+            Some(chunk_array) => {
+                if chunk_array.data.len() > 0 {
+                    Ok(Some(chunk_array.data))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 impl RpcServerImpl {

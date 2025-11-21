@@ -236,7 +236,7 @@ impl FlowWrite for FlowStore {
 
         debug!(
             "Entry batch data at 12288 before insert: {:?}",
-            batch_data_12288.as_ssz_bytes()
+            batch_data_12288
         );
 
         let mut batch_list = Vec::new();
@@ -293,7 +293,7 @@ impl FlowWrite for FlowStore {
 
         debug!(
             "Entry batch data at 12288 after insert: {:?}",
-            batch_data_12288.as_ssz_bytes()
+            batch_data_12288
         );
 
         res

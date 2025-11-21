@@ -87,4 +87,7 @@ pub trait Rpc {
 
     #[method(name = "getFlowContext")]
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)>;
+
+    #[method(name = "getChunkByIndex")]
+    async fn get_chunk_by_index(&self, chunk_index: u64) -> RpcResult<Option<Vec<u8>>>;
 }
