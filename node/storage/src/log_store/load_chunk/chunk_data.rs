@@ -76,9 +76,10 @@ impl Debug for PartialBatch {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PartialBatch: start_offset={} data_len={}",
+            "PartialBatch: start_offset={} data_len={} full_data={:?}",
             self.start_sector,
-            self.data.len()
+            self.data.len(),
+            self.data
         )
     }
 }

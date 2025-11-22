@@ -196,6 +196,11 @@ impl FlowRead for FlowStore {
         Ok(Some(mine_chunk))
     }
 
+    fn load_raw_data(&self, chunk_index: u64, _length: u64) -> Result<Option<EntryBatch>> {
+        let batch = try_option!(self.data_db.get_entry_batch(chunk_index)?);
+        Ok(Some(batch))
+    }
+
     fn get_num_entries(&self) -> Result<u64> {
         // This is an over-estimation as it assumes each batch is full.
         self.data_db

@@ -150,6 +150,16 @@ impl RpcServer for RpcServerImpl {
         self.get_segment_with_proof_by_tx(tx, index).await
     }
 
+    async fn get_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<u8>>> {
+        debug!(%node_index, "zgs_getDataByNodeIndex");
+
+        // Get the EntryBatch for the given segment/chunk index
+        let entry_batch = self.ctx.log_store.get_data_by_node_index(node_index).await?;
+        
+        // Convert to unsealed data using the to_unsealed_data() method
+        Ok(entry_batch.and_then(|batch| batch.to_unsealed_data()))
+    }
+
     async fn check_file_finalized(&self, tx_seq_or_root: TxSeqOrRoot) -> RpcResult<Option<bool>> {
         debug!(?tx_seq_or_root, "zgs_checkFileFinalized");
 
@@ -239,23 +249,14 @@ impl RpcServer for RpcServerImpl {
         Ok(self.ctx.log_store.get_context().await?)
     }
 
-    async fn get_chunk_by_index(&self, chunk_index: u64) -> RpcResult<Option<Vec<u8>>> {
-        debug!(%chunk_index, "zgs_getChunkByIndex");
-        match self
+    async fn get_chunk_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<u8>>> {
+        debug!(%node_index, "zgs_getChunkByNodeIndex");
+        let chunk = self
             .ctx
             .log_store
-            .get_chunk_by_flow_index(chunk_index, 1)
-            .await?
-        {
-            Some(chunk_array) => {
-                if chunk_array.data.len() > 0 {
-                    Ok(Some(chunk_array.data))
-                } else {
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        }
+            .get_chunk_by_flow_index(node_index, 1)
+            .await?;
+        Ok(chunk.map(|c| c.data))
     }
 }
 

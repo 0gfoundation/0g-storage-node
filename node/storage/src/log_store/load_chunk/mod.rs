@@ -158,6 +158,28 @@ impl EntryBatch {
             .collect()
     }
 
+    /// Convert the entire EntryBatch to unsealed Vec<u8>
+    /// This iterates through all seals in the bitmap and unseals sealed data
+    /// Returns the complete raw (unsealed) data for this batch
+    pub fn to_unsealed_data(&self) -> Option<Vec<u8>> {
+        // Get all data for this batch
+        let mut res = Vec::with_capacity(BYTES_PER_LOAD);
+        for bit in 0..SEALS_PER_LOAD {
+            let start_byte = bit as usize * BYTES_PER_SEAL;
+            if self.seal.is_sealed(bit as u16) {
+                // If sealed, we need to unseal this part
+                let mut data_slice = self.data.get(start_byte, BYTES_PER_SEAL)?.to_vec();
+                self.seal.unseal(data_slice.as_mut_slice(), bit as u16);
+                res.extend_from_slice(&data_slice);
+            } else {
+                // If not sealed, we can directly copy the data
+                let data_slice = self.data.get(start_byte, BYTES_PER_SEAL)?;
+                res.extend_from_slice(data_slice);
+            }
+        }
+        Some(res)
+    }
+
     fn truncate_seal(&mut self, truncated_sector: usize) -> Vec<u16> {
         let reverted_seal_index = (truncated_sector / SECTORS_PER_SEAL) as u16;
 

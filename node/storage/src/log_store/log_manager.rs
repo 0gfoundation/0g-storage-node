@@ -2,6 +2,7 @@ use crate::config::ShardConfig;
 use crate::log_store::flow_store::{
     batch_iter_sharded, FlowConfig, FlowDBStore, FlowStore, PadPair,
 };
+use crate::log_store::load_chunk::EntryBatch;
 use crate::log_store::tx_store::{BlockHashAndSubmissionIndex, TransactionStore, TxStatus};
 use crate::log_store::{
     FlowRead, FlowSeal, FlowWrite, LogStoreChunkRead, LogStoreChunkWrite, LogStoreRead,
@@ -717,6 +718,11 @@ impl LogStoreRead for LogManager {
 
     fn load_sealed_data(&self, chunk_index: u64) -> Result<Option<MineLoadChunk>> {
         self.flow_store.load_sealed_data(chunk_index)
+    }
+
+    fn get_data_by_node_index(&self, start_index: u64) -> crate::error::Result<Option<EntryBatch>> {
+        
+        self.flow_store.load_raw_data(start_index, 1)
     }
 
     fn get_shard_config(&self) -> ShardConfig {
