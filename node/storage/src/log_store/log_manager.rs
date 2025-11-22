@@ -721,7 +721,6 @@ impl LogStoreRead for LogManager {
     }
 
     fn get_data_by_node_index(&self, start_index: u64) -> crate::error::Result<Option<EntryBatch>> {
-        
         self.flow_store.load_raw_data(start_index, 1)
     }
 
@@ -1131,7 +1130,10 @@ impl LogManager {
         let chunk_roots = self.flow_store.append_entries(flow_entry_array)?;
         debug!("fill leaf for pora_chunks_merkle");
         for (chunk_index, chunk_root) in chunk_roots {
-            debug!("fill leaf: chunk_index={}, chunk_root={:?}", chunk_index, chunk_root);
+            debug!(
+                "fill leaf: chunk_index={}, chunk_root={:?}",
+                chunk_index, chunk_root
+            );
             if chunk_index < merkle.pora_chunks_merkle.leaves() as u64 {
                 merkle
                     .pora_chunks_merkle

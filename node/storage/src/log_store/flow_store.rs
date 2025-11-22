@@ -243,6 +243,9 @@ impl FlowWrite for FlowStore {
             "Entry batch data at 12288 before insert: {:?}",
             batch_data_12288
         );
+        if let Some(unsealed_data) = batch_data_12288.to_unsealed_data() {
+            debug!("Unsealed data before insert: {:?}", unsealed_data);
+        }
 
         let mut batch_list = Vec::new();
         for (start_entry_index, end_entry_index) in batch_iter(
@@ -300,6 +303,9 @@ impl FlowWrite for FlowStore {
             "Entry batch data at 12288 after insert: {:?}",
             batch_data_12288
         );
+        if let Some(unsealed_data) = batch_data_12288.to_unsealed_data() {
+            debug!("Unsealed data after insert: {:?}", unsealed_data);
+        }
 
         res
     }

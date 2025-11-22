@@ -2,7 +2,7 @@ use crate::types::{FileInfo, Segment, SegmentWithProof, Status};
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
 use shared_types::{DataRoot, FlowProof, TxSeqOrRoot};
-use storage::{H256, config::ShardConfig};
+use storage::{config::ShardConfig, H256};
 
 #[rpc(server, client, namespace = "zgs")]
 pub trait Rpc {
@@ -60,7 +60,7 @@ pub trait Rpc {
     ) -> RpcResult<Option<SegmentWithProof>>;
 
     #[method(name = "getDataByNodeIndex")]
-    async fn get_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<u8>>>;
+    async fn get_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<Vec<u8>>>>;
 
     #[method(name = "checkFileFinalized")]
     async fn check_file_finalized(&self, tx_seq_or_root: TxSeqOrRoot) -> RpcResult<Option<bool>>;

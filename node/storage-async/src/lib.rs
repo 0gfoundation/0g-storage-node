@@ -7,8 +7,8 @@ use shared_types::{
     Chunk, ChunkArray, ChunkArrayWithProof, DataRoot, FlowProof, FlowRangeProof, Transaction,
 };
 use ssz::{Decode, Encode};
-use storage::log_store::load_chunk::EntryBatch;
 use std::sync::Arc;
+use storage::log_store::load_chunk::EntryBatch;
 use storage::{error, error::Result, log_store::Store as LogStore, H256};
 use task_executor::TaskExecutor;
 use tokio::sync::oneshot;
