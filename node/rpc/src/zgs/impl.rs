@@ -168,6 +168,20 @@ impl RpcServer for RpcServerImpl {
         }))
     }
 
+    async fn get_meta_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<String>> {
+        debug!(%node_index, "zgs_getMetaDataByNodeIndex");
+
+        // Get the EntryBatch for the given segment/chunk index
+        let entry_batch = self
+            .ctx
+            .log_store
+            .get_data_by_node_index(node_index)
+            .await?;
+
+        let res = format!("{:?}", entry_batch);
+        Ok(Some(res))
+    }
+
     async fn check_file_finalized(&self, tx_seq_or_root: TxSeqOrRoot) -> RpcResult<Option<bool>> {
         debug!(?tx_seq_or_root, "zgs_checkFileFinalized");
 
@@ -255,16 +269,6 @@ impl RpcServer for RpcServerImpl {
 
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)> {
         Ok(self.ctx.log_store.get_context().await?)
-    }
-
-    async fn get_chunk_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<u8>>> {
-        debug!(%node_index, "zgs_getChunkByNodeIndex");
-        let chunk = self
-            .ctx
-            .log_store
-            .get_chunk_by_flow_index(node_index, 1)
-            .await?;
-        Ok(chunk.map(|c| c.data))
     }
 }
 
