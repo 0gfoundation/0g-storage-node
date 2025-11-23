@@ -21,7 +21,6 @@ use parking_lot::{Mutex, RwLock};
 use shared_types::{ChunkArray, DataRoot, FlowProof};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode as DeriveDecode, Encode as DeriveEncode};
-use std::collections::HashMap;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -420,53 +419,25 @@ pub struct PadPair {
 
 pub struct FlowDBStore {
     kvdb: Arc<dyn ZgsKeyValueDB>,
-    // Per-batch mutexes to prevent race conditions on individual batches
-    batch_mutexes: RwLock<HashMap<u64, Arc<Mutex<()>>>>,
+    // Mutex to prevent race condition between put_entry_batch_list and put_entry_raw
+    write_mutex: Mutex<()>,
 }
 
 impl FlowDBStore {
     pub fn new(kvdb: Arc<dyn ZgsKeyValueDB>) -> Self {
         Self {
             kvdb,
-            batch_mutexes: RwLock::new(HashMap::new()),
+            write_mutex: Mutex::new(()),
         }
-    }
-
-    fn get_batch_mutex(&self, batch_index: u64) -> Arc<Mutex<()>> {
-        let read_guard = self.batch_mutexes.read();
-        if let Some(mutex) = read_guard.get(&batch_index) {
-            return mutex.clone();
-        }
-        drop(read_guard);
-
-        let mut write_guard = self.batch_mutexes.write();
-        // Double-check pattern
-        if let Some(mutex) = write_guard.get(&batch_index) {
-            return mutex.clone();
-        }
-        let mutex = Arc::new(Mutex::new(()));
-        write_guard.insert(batch_index, mutex.clone());
-        mutex
     }
 
     fn put_entry_batch_list(
         &self,
         batch_list: Vec<(u64, EntryBatch)>,
     ) -> Result<Vec<(u64, DataRoot)>> {
+        let _lock = self.write_mutex.lock();
         let start_time = Instant::now();
         let mut completed_batches = Vec::new();
-
-        // Collect all mutexes and locks first to avoid deadlocks
-        let batch_mutexes: Vec<_> = batch_list
-            .iter()
-            .map(|(batch_index, _)| (*batch_index, self.get_batch_mutex(*batch_index)))
-            .collect();
-
-        let _locks: Vec<_> = batch_mutexes
-            .iter()
-            .map(|(_, mutex)| mutex.lock())
-            .collect();
-
         let mut tx = self.kvdb.transaction();
 
         for (batch_index, batch) in batch_list {
@@ -481,23 +452,12 @@ impl FlowDBStore {
             }
         }
         self.kvdb.write(tx)?;
-        // Locks are dropped here
         metrics::PUT_ENTRY_BATCH_LIST.update_since(start_time);
         Ok(completed_batches)
     }
 
     fn put_entry_raw(&self, batch_list: Vec<(u64, EntryBatch)>) -> Result<()> {
-        // Collect all mutexes and locks first to avoid deadlocks
-        let batch_mutexes: Vec<_> = batch_list
-            .iter()
-            .map(|(batch_index, _)| (*batch_index, self.get_batch_mutex(*batch_index)))
-            .collect();
-
-        let _locks: Vec<_> = batch_mutexes
-            .iter()
-            .map(|(_, mutex)| mutex.lock())
-            .collect();
-
+        let _lock = self.write_mutex.lock();
         let mut tx = self.kvdb.transaction();
         for (batch_index, batch) in batch_list {
             tx.put(
@@ -507,7 +467,6 @@ impl FlowDBStore {
             );
         }
         self.kvdb.write(tx)?;
-        // Locks are dropped here
         Ok(())
     }
 
