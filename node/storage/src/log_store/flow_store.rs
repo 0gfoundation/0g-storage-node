@@ -270,17 +270,17 @@ impl FlowWrite for FlowStore {
                 .get_entry_batch(chunk_index)?
                 .unwrap_or_else(|| EntryBatch::new(chunk_index));
 
-            let completed_seals = batch.insert_data(
+            let _ = batch.insert_data(
                 (chunk.start_index % self.config.batch_size as u64) as usize,
                 chunk.data,
             )?;
-            if self.seal_manager.seal_worker_available() {
-                completed_seals.into_iter().for_each(|x| {
+            if self.seal_manager.seal_worker_available() && batch.is_complete() {
+                for seal_index in 0..SEALS_PER_LOAD {
                     to_seal_set.insert(
-                        chunk_index as usize * SEALS_PER_LOAD + x as usize,
+                        chunk_index as usize * SEALS_PER_LOAD + seal_index,
                         self.seal_manager.to_seal_version(),
                     );
-                });
+                }
             }
 
             batch_list.push((chunk_index, batch));

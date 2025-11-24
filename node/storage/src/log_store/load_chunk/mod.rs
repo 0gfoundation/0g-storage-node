@@ -38,6 +38,12 @@ impl UnsealedDataList {
     }
 }
 
+impl Default for UnsealedDataList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 use super::SealAnswer;
 pub use chunk_data::EntryBatchData;
 use seal::SealInfo;
@@ -59,6 +65,11 @@ impl EntryBatch {
 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    /// Check if the batch data is complete (all data has been filled)
+    pub fn is_complete(&self) -> bool {
+        matches!(self.data, EntryBatchData::Complete(_))
     }
 }
 
@@ -192,9 +203,9 @@ impl EntryBatch {
                 // If complete, return the entire unsealed data as a single chunk
                 let mut result = UnsealedDataList::new();
                 let mut complete_data = Vec::with_capacity(BYTES_PER_LOAD);
-                
+
                 for bit in 0..SEALS_PER_LOAD {
-                    let start_byte = bit as usize * BYTES_PER_SEAL;
+                    let start_byte = bit * BYTES_PER_SEAL;
                     if self.seal.is_sealed(bit as u16) {
                         // If sealed, get the slice, unseal it, and append
                         let mut data_slice = self.data.get(start_byte, BYTES_PER_SEAL)?.to_vec();
@@ -206,7 +217,7 @@ impl EntryBatch {
                         complete_data.extend_from_slice(data_slice);
                     }
                 }
-                
+
                 result.add_chunk(complete_data);
                 Some(result)
             }
@@ -215,14 +226,12 @@ impl EntryBatch {
                 debug!("Building unsealed data from incomplete known data");
                 let mut result = UnsealedDataList::new();
                 for partial_batch in &incomplete_data.known_data {
-                    
                     let start_sector = partial_batch.start_sector;
                     let data_len = partial_batch.data.len();
 
                     debug!(
                         "Processing partial batch: start_sector={} data_len={}",
-                        start_sector,
-                        data_len
+                        start_sector, data_len
                     );
 
                     if data_len == 0 {
@@ -241,14 +250,12 @@ impl EntryBatch {
 
                     debug!(
                         "Partial batch spans seals: start_seal_index={} end_seal_index={}",
-                        start_seal_index,
-                        end_seal_index
+                        start_seal_index, end_seal_index
                     );
 
                     debug!(
                         "Partial batch byte range: {} to {}",
-                        partial_start_byte,
-                        partial_end_byte
+                        partial_start_byte, partial_end_byte
                     );
 
                     // Iterate through each seal that this partial batch spans
@@ -262,9 +269,7 @@ impl EntryBatch {
 
                         debug!(
                             "Processing seal_start_byte={} seal_end_byte={} is_full_seal={}",
-                            seal_start_byte,
-                            seal_end_byte,
-                            is_full_seal
+                            seal_start_byte, seal_end_byte, is_full_seal
                         );
 
                         if is_full_seal && self.seal.is_sealed(seal_index) {
@@ -285,7 +290,7 @@ impl EntryBatch {
                             partial_batch_data.extend_from_slice(overlap_data);
                         }
                     }
-                    
+
                     // Add the complete unsealed data for this partial batch as one chunk
                     result.add_chunk(partial_batch_data);
                 }
