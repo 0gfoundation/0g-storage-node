@@ -279,9 +279,7 @@ impl FlowWrite for FlowStore {
         }
 
         metrics::APPEND_ENTRIES.update_since(start_time);
-        let res = self.data_db.put_entry_batch_list(batch_list);
-
-        res
+        self.data_db.put_entry_batch_list(batch_list)
     }
 
     fn truncate(&self, start_index: u64) -> crate::error::Result<()> {
