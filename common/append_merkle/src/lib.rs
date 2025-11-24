@@ -309,8 +309,6 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
     /// Panics if the leaf is already set and different or the index is out of range.
     /// TODO: Batch computing intermediate nodes.
     pub fn fill_leaf(&mut self, index: usize, leaf: E) {
-        // print node leaf at 12288 index
-
         if leaf.is_null() {
             // fill leaf with null is not allowed.
         } else if self.node(0, index).is_null() {

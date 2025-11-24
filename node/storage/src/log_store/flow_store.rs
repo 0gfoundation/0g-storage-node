@@ -234,19 +234,6 @@ impl FlowWrite for FlowStore {
             bail!("append_entries: invalid data size, len={}", data.data.len());
         }
 
-        let batch_data_12288 = self
-            .data_db
-            .get_entry_batch(12288)?
-            .unwrap_or_else(|| EntryBatch::new(12288));
-
-        debug!(
-            "Entry batch data at 12288 before insert: {:?}",
-            batch_data_12288
-        );
-        if let Some(unsealed_data) = batch_data_12288.to_unsealed_data() {
-            debug!("Unsealed data before insert: {:?}", unsealed_data);
-        }
-
         let mut batch_list = Vec::new();
         for (start_entry_index, end_entry_index) in batch_iter(
             data.start_index,
@@ -293,19 +280,6 @@ impl FlowWrite for FlowStore {
 
         metrics::APPEND_ENTRIES.update_since(start_time);
         let res = self.data_db.put_entry_batch_list(batch_list);
-
-        let batch_data_12288 = self
-            .data_db
-            .get_entry_batch(12288)?
-            .unwrap_or_else(|| EntryBatch::new(12288));
-
-        debug!(
-            "Entry batch data at 12288 after insert: {:?}",
-            batch_data_12288
-        );
-        if let Some(unsealed_data) = batch_data_12288.to_unsealed_data() {
-            debug!("Unsealed data after insert: {:?}", unsealed_data);
-        }
 
         res
     }
