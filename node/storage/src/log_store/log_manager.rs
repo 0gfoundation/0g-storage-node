@@ -2,6 +2,7 @@ use crate::config::ShardConfig;
 use crate::log_store::flow_store::{
     batch_iter_sharded, FlowConfig, FlowDBStore, FlowStore, PadPair,
 };
+use crate::log_store::load_chunk::EntryBatch;
 use crate::log_store::tx_store::{BlockHashAndSubmissionIndex, TransactionStore, TxStatus};
 use crate::log_store::{
     FlowRead, FlowSeal, FlowWrite, LogStoreChunkRead, LogStoreChunkWrite, LogStoreRead,
@@ -564,6 +565,12 @@ impl LogStoreRead for LogManager {
         self.tx_store.get_tx_by_seq_number(seq)
     }
 
+    fn get_node_hash_by_index(&self, index: u64) -> crate::error::Result<OptionalHash> {
+        let merkle = self.merkle.read();
+        let opt = merkle.pora_chunks_merkle.leaf_at(index as usize)?;
+        opt.ok_or_else(|| anyhow!("node hash not found at index {}", index))
+    }
+
     fn get_tx_seq_by_data_root(
         &self,
         data_root: &DataRoot,
@@ -711,6 +718,10 @@ impl LogStoreRead for LogManager {
 
     fn load_sealed_data(&self, chunk_index: u64) -> Result<Option<MineLoadChunk>> {
         self.flow_store.load_sealed_data(chunk_index)
+    }
+
+    fn get_data_by_node_index(&self, start_index: u64) -> crate::error::Result<Option<EntryBatch>> {
+        self.flow_store.load_raw_data(start_index, 1)
     }
 
     fn get_shard_config(&self) -> ShardConfig {
@@ -1115,8 +1126,14 @@ impl LogManager {
                 .pora_chunks_merkle
                 .update_last(merkle.last_chunk_merkle.root());
         }
+
         let chunk_roots = self.flow_store.append_entries(flow_entry_array)?;
+        debug!("fill leaf for pora_chunks_merkle");
         for (chunk_index, chunk_root) in chunk_roots {
+            debug!(
+                "fill leaf: chunk_index={}, chunk_root={:?}",
+                chunk_index, chunk_root
+            );
             if chunk_index < merkle.pora_chunks_merkle.leaves() as u64 {
                 merkle
                     .pora_chunks_merkle
@@ -1157,8 +1174,8 @@ impl LogManager {
         let (segments_for_proof, last_segment_size_for_proof) =
             compute_segment_size(chunks, PORA_CHUNK_SIZE);
         debug!(
-            "segments_for_proof: {}, last_segment_size_for_proof: {}",
-            segments_for_proof, last_segment_size_for_proof
+            "tx seq: {}, segments_for_proof: {}, last_segment_size_for_proof: {}",
+            tx.seq, segments_for_proof, last_segment_size_for_proof
         );
 
         let chunks_for_file = bytes_to_entries(tx.size) as usize;
@@ -1169,6 +1186,16 @@ impl LogManager {
             segments_for_file, last_segment_size_for_file
         );
 
+        // Padding should only start after real data ends
+        let real_data_end_index =
+            (segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file;
+        debug!(
+            "Padding: real_data_end_index={}, padding_start_segment={}, padding_start_offset={}",
+            real_data_end_index,
+            segments_for_file - 1,
+            last_segment_size_for_file
+        );
+
         while segments_for_file <= segments_for_proof {
             let padding_size = if segments_for_file == segments_for_proof {
                 (last_segment_size_for_proof - last_segment_size_for_file) * ENTRY_SIZE
@@ -1176,7 +1203,17 @@ impl LogManager {
                 (PORA_CHUNK_SIZE - last_segment_size_for_file) * ENTRY_SIZE
             };
 
-            debug!("Padding size: {}", padding_size);
+            let padding_start_index =
+                ((segments_for_file - 1) * PORA_CHUNK_SIZE + last_segment_size_for_file) as u64;
+
+            debug!(
+                "Padding iteration: segment={}, offset={}, padding_size={}, start_index={}",
+                segments_for_file - 1,
+                last_segment_size_for_file,
+                padding_size,
+                padding_start_index
+            );
+
             if padding_size > 0 {
                 // This tx hash is guaranteed to be consistent.
                 self.put_chunks_with_tx_hash(
@@ -1184,9 +1221,7 @@ impl LogManager {
                     tx.hash(),
                     ChunkArray {
                         data: vec![0u8; padding_size],
-                        start_index: ((segments_for_file - 1) * PORA_CHUNK_SIZE
-                            + last_segment_size_for_file)
-                            as u64,
+                        start_index: padding_start_index,
                     },
                     None,
                 )?;

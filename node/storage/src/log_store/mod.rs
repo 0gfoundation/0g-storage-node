@@ -1,5 +1,6 @@
-use crate::config::ShardConfig;
+use crate::{config::ShardConfig, log_store::load_chunk::EntryBatch};
 
+use append_merkle::OptionalHash;
 use ethereum_types::H256;
 use flow_store::PadPair;
 use shared_types::{
@@ -29,6 +30,8 @@ pub mod tx_store;
 pub trait LogStoreRead: LogStoreChunkRead {
     /// Get a transaction by its global log sequence number.
     fn get_tx_by_seq_number(&self, seq: u64) -> Result<Option<Transaction>>;
+
+    fn get_node_hash_by_index(&self, index: u64) -> Result<OptionalHash>;
 
     /// Get a transaction by the data root of its data.
     /// If all txs are not finalized, return the first one if need available is false.
@@ -99,6 +102,8 @@ pub trait LogStoreRead: LogStoreChunkRead {
     fn get_num_entries(&self) -> Result<u64>;
 
     fn load_sealed_data(&self, chunk_index: u64) -> Result<Option<MineLoadChunk>>;
+
+    fn get_data_by_node_index(&self, start_index: u64) -> Result<Option<EntryBatch>>;
 
     fn get_shard_config(&self) -> ShardConfig;
 }
@@ -230,6 +235,8 @@ pub trait FlowRead {
     fn get_available_entries(&self, index_start: u64, index_end: u64) -> Result<Vec<ChunkArray>>;
 
     fn load_sealed_data(&self, chunk_index: u64) -> Result<Option<MineLoadChunk>>;
+
+    fn load_raw_data(&self, chunk_index: u64, length: u64) -> Result<Option<EntryBatch>>;
 
     // An estimation of the number of entries in the flow db.
     fn get_num_entries(&self) -> Result<u64>;

@@ -78,7 +78,7 @@ impl Debug for PartialBatch {
             f,
             "PartialBatch: start_offset={} data_len={}",
             self.start_sector,
-            self.data.len()
+            self.data.len(),
         )
     }
 }

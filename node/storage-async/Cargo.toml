@@ -8,6 +8,7 @@ anyhow = { version = "1.0.58", features = ["backtrace"] }
 shared_types = { path = "../shared_types" }
 storage = { path = "../storage" }
 task_executor = { path = "../../common/task_executor" }
+append_merkle = { path = "../../common/append_merkle" }
 tokio = { version = "1.19.2", features = ["sync"] }
 tracing = "0.1.35"
 eth2_ssz = "0.4.0"

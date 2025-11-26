@@ -59,6 +59,12 @@ pub trait Rpc {
         index: usize,
     ) -> RpcResult<Option<SegmentWithProof>>;
 
+    #[method(name = "getDataByNodeIndex")]
+    async fn get_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<Vec<u8>>>>;
+
+    #[method(name = "getMetaDataByNodeIndex")]
+    async fn get_meta_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<String>>;
+
     #[method(name = "checkFileFinalized")]
     async fn check_file_finalized(&self, tx_seq_or_root: TxSeqOrRoot) -> RpcResult<Option<bool>>;
 
@@ -81,6 +87,9 @@ pub trait Rpc {
         sector_index: u64,
         flow_root: Option<DataRoot>,
     ) -> RpcResult<FlowProof>;
+
+    #[method(name = "getHashAtNodeIndex")]
+    async fn get_hash_at_node_index(&self, node_index: u64) -> RpcResult<Option<H256>>;
 
     #[method(name = "getFlowContext")]
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)>;

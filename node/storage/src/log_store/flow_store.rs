@@ -17,7 +17,7 @@ use append_merkle::{
 };
 use itertools::Itertools;
 use kvdb::DBTransaction;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use shared_types::{ChunkArray, DataRoot, FlowProof};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode as DeriveDecode, Encode as DeriveEncode};
@@ -196,6 +196,11 @@ impl FlowRead for FlowStore {
         Ok(Some(mine_chunk))
     }
 
+    fn load_raw_data(&self, chunk_index: u64, _length: u64) -> Result<Option<EntryBatch>> {
+        let batch = try_option!(self.data_db.get_entry_batch(chunk_index)?);
+        Ok(Some(batch))
+    }
+
     fn get_num_entries(&self) -> Result<u64> {
         // This is an over-estimation as it assumes each batch is full.
         self.data_db
@@ -228,6 +233,7 @@ impl FlowWrite for FlowStore {
         if data.data.len() % BYTES_PER_SECTOR != 0 {
             bail!("append_entries: invalid data size, len={}", data.data.len());
         }
+
         let mut batch_list = Vec::new();
         for (start_entry_index, end_entry_index) in batch_iter(
             data.start_index,
@@ -250,20 +256,26 @@ impl FlowWrite for FlowStore {
                 .data_db
                 .get_entry_batch(chunk_index)?
                 .unwrap_or_else(|| EntryBatch::new(chunk_index));
-            let completed_seals = batch.insert_data(
+
+            let _ = batch.insert_data(
                 (chunk.start_index % self.config.batch_size as u64) as usize,
                 chunk.data,
             )?;
-            if self.seal_manager.seal_worker_available() {
-                completed_seals.into_iter().for_each(|x| {
+            if self.seal_manager.seal_worker_available() && batch.is_complete() {
+                for seal_index in 0..SEALS_PER_LOAD {
                     to_seal_set.insert(
-                        chunk_index as usize * SEALS_PER_LOAD + x as usize,
+                        chunk_index as usize * SEALS_PER_LOAD + seal_index,
                         self.seal_manager.to_seal_version(),
                     );
-                });
+                }
             }
 
             batch_list.push((chunk_index, batch));
+        }
+
+        // print which indexes are being pushed to batch_list
+        for (chunk_index, _) in &batch_list {
+            debug!("Preparing to insert chunk at index: {}", chunk_index);
         }
 
         metrics::APPEND_ENTRIES.update_since(start_time);
@@ -379,20 +391,27 @@ pub struct PadPair {
 
 pub struct FlowDBStore {
     kvdb: Arc<dyn ZgsKeyValueDB>,
+    // Mutex to prevent race condition between put_entry_batch_list and put_entry_raw
+    write_mutex: Mutex<()>,
 }
 
 impl FlowDBStore {
     pub fn new(kvdb: Arc<dyn ZgsKeyValueDB>) -> Self {
-        Self { kvdb }
+        Self {
+            kvdb,
+            write_mutex: Mutex::new(()),
+        }
     }
 
     fn put_entry_batch_list(
         &self,
         batch_list: Vec<(u64, EntryBatch)>,
     ) -> Result<Vec<(u64, DataRoot)>> {
+        let _lock = self.write_mutex.lock();
         let start_time = Instant::now();
         let mut completed_batches = Vec::new();
         let mut tx = self.kvdb.transaction();
+
         for (batch_index, batch) in batch_list {
             tx.put(
                 COL_ENTRY_BATCH,
@@ -410,6 +429,7 @@ impl FlowDBStore {
     }
 
     fn put_entry_raw(&self, batch_list: Vec<(u64, EntryBatch)>) -> Result<()> {
+        let _lock = self.write_mutex.lock();
         let mut tx = self.kvdb.transaction();
         for (batch_index, batch) in batch_list {
             tx.put(

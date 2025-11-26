@@ -150,6 +150,38 @@ impl RpcServer for RpcServerImpl {
         self.get_segment_with_proof_by_tx(tx, index).await
     }
 
+    async fn get_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<Vec<Vec<u8>>>> {
+        debug!(%node_index, "zgs_getDataByNodeIndex");
+
+        // Get the EntryBatch for the given segment/chunk index
+        let entry_batch = self
+            .ctx
+            .log_store
+            .get_data_by_node_index(node_index)
+            .await?;
+
+        // Convert to unsealed data using the to_unsealed_data() method
+        Ok(entry_batch.and_then(|batch| {
+            batch
+                .to_unsealed_data()
+                .map(|unsealed_list| unsealed_list.chunks)
+        }))
+    }
+
+    async fn get_meta_data_by_node_index(&self, node_index: u64) -> RpcResult<Option<String>> {
+        debug!(%node_index, "zgs_getMetaDataByNodeIndex");
+
+        // Get the EntryBatch for the given segment/chunk index
+        let entry_batch = self
+            .ctx
+            .log_store
+            .get_data_by_node_index(node_index)
+            .await?;
+
+        let res = format!("{:?}", entry_batch);
+        Ok(Some(res))
+    }
+
     async fn check_file_finalized(&self, tx_seq_or_root: TxSeqOrRoot) -> RpcResult<Option<bool>> {
         debug!(?tx_seq_or_root, "zgs_checkFileFinalized");
 
@@ -223,6 +255,16 @@ impl RpcServer for RpcServerImpl {
             .await?;
         assert_eq!(proof.left_proof, proof.right_proof);
         Ok(proof.right_proof)
+    }
+
+    async fn get_hash_at_node_index(&self, node_index: u64) -> RpcResult<Option<H256>> {
+        debug!(%node_index, "zgs_getHashAtNodeIndex");
+        let hash = self
+            .ctx
+            .log_store
+            .get_node_hash_by_index(node_index)
+            .await?;
+        Ok(hash.0)
     }
 
     async fn get_flow_context(&self) -> RpcResult<(H256, u64)> {
