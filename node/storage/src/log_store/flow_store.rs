@@ -17,7 +17,7 @@ use append_merkle::{
 };
 use itertools::Itertools;
 use kvdb::DBTransaction;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use shared_types::{ChunkArray, DataRoot, FlowProof};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode as DeriveDecode, Encode as DeriveEncode};
