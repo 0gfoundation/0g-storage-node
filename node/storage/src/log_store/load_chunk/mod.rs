@@ -71,6 +71,11 @@ impl EntryBatch {
     pub fn is_complete(&self) -> bool {
         matches!(self.data, EntryBatchData::Complete(_))
     }
+
+    /// Check if a specific seal is already sealed
+    pub fn is_seal_sealed(&self, seal_index: u16) -> bool {
+        self.seal.is_sealed(seal_index)
+    }
 }
 
 impl EntryBatch {
