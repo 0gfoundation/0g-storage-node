@@ -17,7 +17,7 @@ use append_merkle::{
 };
 use itertools::Itertools;
 use kvdb::DBTransaction;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use shared_types::{ChunkArray, DataRoot, FlowProof};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode as DeriveDecode, Encode as DeriveEncode};
@@ -263,10 +263,13 @@ impl FlowWrite for FlowStore {
             )?;
             if self.seal_manager.seal_worker_available() && batch.is_complete() {
                 for seal_index in 0..SEALS_PER_LOAD {
-                    to_seal_set.insert(
-                        chunk_index as usize * SEALS_PER_LOAD + seal_index,
-                        self.seal_manager.to_seal_version(),
-                    );
+                    // Only add seals that are not already sealed
+                    if !batch.is_seal_sealed(seal_index as u16) {
+                        to_seal_set.insert(
+                            chunk_index as usize * SEALS_PER_LOAD + seal_index,
+                            self.seal_manager.to_seal_version(),
+                        );
+                    }
                 }
             }
 
@@ -391,23 +394,17 @@ pub struct PadPair {
 
 pub struct FlowDBStore {
     kvdb: Arc<dyn ZgsKeyValueDB>,
-    // Mutex to prevent race condition between put_entry_batch_list and put_entry_raw
-    write_mutex: Mutex<()>,
 }
 
 impl FlowDBStore {
     pub fn new(kvdb: Arc<dyn ZgsKeyValueDB>) -> Self {
-        Self {
-            kvdb,
-            write_mutex: Mutex::new(()),
-        }
+        Self { kvdb }
     }
 
     fn put_entry_batch_list(
         &self,
         batch_list: Vec<(u64, EntryBatch)>,
     ) -> Result<Vec<(u64, DataRoot)>> {
-        let _lock = self.write_mutex.lock();
         let start_time = Instant::now();
         let mut completed_batches = Vec::new();
         let mut tx = self.kvdb.transaction();
@@ -429,7 +426,6 @@ impl FlowDBStore {
     }
 
     fn put_entry_raw(&self, batch_list: Vec<(u64, EntryBatch)>) -> Result<()> {
-        let _lock = self.write_mutex.lock();
         let mut tx = self.kvdb.transaction();
         for (batch_index, batch) in batch_list {
             tx.put(
