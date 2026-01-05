@@ -42,6 +42,9 @@ pub trait LogStoreRead: LogStoreChunkRead {
         need_available: bool,
     ) -> Result<Option<u64>>;
 
+    /// Return seq list filtered to unpruned entries.
+    fn get_tx_seq_list_by_data_root(&self, data_root: &DataRoot) -> Result<Vec<u64>>;
+
     /// If all txs are not finalized, return the first one if need available is false.
     /// Otherwise, return the first finalized tx.
     fn get_tx_by_data_root(
