@@ -27,30 +27,6 @@ CONFIG_DIR = os.path.dirname(__file__)
 ZGS_KEY_FILE = os.path.join(CONFIG_DIR, "zgs", "network", "key")
 ZGS_NODEID = "16Uiu2HAmLkGFUbNFYdhuSbTQ5hmnPjFXx2zUDtwQ2uihHpN9YNNe"
 
-BSC_CONFIG = dict(
-    NetworkId=1000,
-    HTTPPort=8545,
-    HTTPHost="127.0.0.1",
-    Etherbase="0x7df9a875a174b3bc565e6424a0050ebc1b2d1d82",
-    DataDir="test/local_ethereum_blockchain/node1",
-    Port=30303,
-    Verbosity=5,
-)
-
-CONFLUX_CONFIG = dict(
-    mode="dev",
-    chain_id=10,
-    jsonrpc_http_eth_port=8545,
-    tcp_port=32323,
-    log_level="debug",
-    log_file="./conflux.log",
-    public_address="127.0.0.1",
-    poll_lifetime_in_seconds=60,
-    dev_allow_phase_change_without_peer="true",
-    dev_block_interval_ms=200,
-)
-
-BLOCK_SIZE_LIMIT = 200 * 1024
 # 0xfbe45681Ac6C53D5a40475F7526baC1FE7590fb8
 GENESIS_PRIV_KEY = "46b9e861b63d3509c88b7817275a30d22d62c8cd8fa6486ddee35ef0d8e0495f"
 MINER_ID = "308a6e102a5829ba35e4ba1da0473c3e8bd45f5d3ffb91e31adb43f25463dddb"

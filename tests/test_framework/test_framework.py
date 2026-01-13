@@ -14,7 +14,6 @@ import traceback
 from pathlib import Path
 
 from eth_utils import encode_hex
-from test_framework.bsc_node import BSCNode
 from test_framework.contract_proxy import (
     FlowContractProxy,
     MineContractProxy,
@@ -22,7 +21,6 @@ from test_framework.contract_proxy import (
 )
 from test_framework.zgs_node import ZgsNode
 from test_framework.blockchain_node import BlockChainNodeType
-from test_framework.conflux_node import ConfluxNode, connect_sample_nodes
 from test_framework.zg_node import ZGNode, zg_node_init_genesis
 from utility.utils import PortMin, is_windows_platform, wait_until, assert_equal
 from utility.build_binary import build_cli
@@ -65,12 +63,6 @@ class TestFramework:
         binary_ext = ".exe" if is_windows_platform() else ""
         tests_dir = os.path.dirname(__file_path__)
         root_dir = os.path.dirname(tests_dir)
-        self.__default_conflux_binary__ = os.path.join(
-            tests_dir, "tmp", "conflux" + binary_ext
-        )
-        self.__default_geth_binary__ = os.path.join(
-            tests_dir, "tmp", "geth" + binary_ext
-        )
         self.__default_zg_binary__ = os.path.join(
             tests_dir, "tmp", "0gchaind" + binary_ext
         )
@@ -96,27 +88,7 @@ class TestFramework:
             else:
                 updated_config = {}
 
-            node = None
-            if self.blockchain_node_type == BlockChainNodeType.BSC:
-                node = BSCNode(
-                    i,
-                    self.root_dir,
-                    self.blockchain_binary,
-                    updated_config,
-                    self.contract_path,
-                    self.log,
-                    60,
-                )
-            elif self.blockchain_node_type == BlockChainNodeType.Conflux:
-                node = ConfluxNode(
-                    i,
-                    self.root_dir,
-                    self.blockchain_binary,
-                    updated_config,
-                    self.contract_path,
-                    self.log,
-                )
-            elif self.blockchain_node_type == BlockChainNodeType.ZG:
+            if self.blockchain_node_type == BlockChainNodeType.ZG:
                 node = ZGNode(
                     i,
                     self.root_dir,
@@ -137,44 +109,7 @@ class TestFramework:
         for node in self.blockchain_nodes:
             node.wait_for_rpc_connection()
 
-        if self.blockchain_node_type == BlockChainNodeType.BSC:
-            enodes = set(
-                [node.admin_nodeInfo()["enode"] for node in self.blockchain_nodes[1:]]
-            )
-            for enode in enodes:
-                self.blockchain_nodes[0].admin_addPeer([enode])
-
-            # mine
-            self.blockchain_nodes[0].miner_start([1])
-
-            def wait_for_peer():
-                peers = self.blockchain_nodes[0].admin_peers()
-                for peer in peers:
-                    if peer["enode"] in enodes:
-                        enodes.remove(peer["enode"])
-
-                if enodes:
-                    for enode in enodes:
-                        self.blockchain_nodes[0].admin_addPeer([enode])
-                    return False
-
-                return True
-
-            wait_until(lambda: wait_for_peer())
-
-            for node in self.blockchain_nodes:
-                node.wait_for_start_mining()
-        elif self.blockchain_node_type == BlockChainNodeType.Conflux:
-            for node in self.blockchain_nodes:
-                node.wait_for_nodeid()
-
-            # make nodes full connected
-            if self.num_blockchain_nodes > 1:
-                connect_sample_nodes(self.blockchain_nodes, self.log)
-                # The default is `dev` mode with auto mining, so it's not guaranteed that blocks
-                # can be synced in time for `sync_blocks` to pass.
-                # sync_blocks(self.blockchain_nodes)
-        elif self.blockchain_node_type == BlockChainNodeType.ZG:
+        if self.blockchain_node_type == BlockChainNodeType.ZG:
             # wait for the first block
             self.log.debug("Wait for 0gchain node to generate first block")
             time.sleep(0.5)
@@ -238,20 +173,6 @@ class TestFramework:
             node.wait_for_rpc_connection()
 
     def add_arguments(self, parser: argparse.ArgumentParser):
-        parser.add_argument(
-            "--conflux-binary",
-            dest="conflux",
-            default=self.__default_conflux_binary__,
-            type=str,
-        )
-
-        parser.add_argument(
-            "--bsc-binary",
-            dest="bsc",
-            default=self.__default_geth_binary__,
-            type=str,
-        )
-
         parser.add_argument(
             "--zg-binary",
             dest="zg",
@@ -527,11 +448,7 @@ class TestFramework:
             os.symlink(self.options.tmpdir, dst)
             self.log.info("Symlink: %s", Path(dst).absolute())
 
-        if self.blockchain_node_type == BlockChainNodeType.Conflux:
-            self.blockchain_binary = os.path.abspath(self.options.conflux)
-        elif self.blockchain_node_type == BlockChainNodeType.BSC:
-            self.blockchain_binary = os.path.abspath(self.options.bsc)
-        elif self.blockchain_node_type == BlockChainNodeType.ZG:
+        if self.blockchain_node_type == BlockChainNodeType.ZG:
             self.blockchain_binary = os.path.abspath(self.options.zg)
         else:
             raise NotImplementedError

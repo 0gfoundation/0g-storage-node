@@ -10,66 +10,19 @@ from utility.utils import is_windows_platform, wait_until
 
 # v1.0.0-ci release
 GITHUB_DOWNLOAD_URL = (
-    "https://api.github.com/repos/0glabs/0g-storage-node/releases/152560136"
+    "https://api.github.com/repos/0gfoundation/0g-storage-node/releases/276222268"
 )
 
-CONFLUX_BINARY = "conflux.exe" if is_windows_platform() else "conflux"
-BSC_BINARY = "geth.exe" if is_windows_platform() else "geth"
 ZG_BINARY = "0gchaind.exe" if is_windows_platform() else "0gchaind"
 CLIENT_BINARY = (
     "0g-storage-client.exe" if is_windows_platform() else "0g-storage-client"
 )
-
-CLI_GIT_REV = "98d74b7e7e6084fc986cb43ce2c66692dac094a6"
-
 
 @unique
 class BuildBinaryResult(Enum):
     AlreadyExists = 0
     Installed = 1
     NotInstalled = 2
-
-
-def build_conflux(dir: str) -> BuildBinaryResult:
-    # Download or build conflux binary if absent
-    result = __download_from_github(
-        dir=dir,
-        binary_name=CONFLUX_BINARY,
-        github_url=GITHUB_DOWNLOAD_URL,
-        asset_name=__asset_name(CONFLUX_BINARY, zip=True),
-    )
-
-    if (
-        result == BuildBinaryResult.AlreadyExists
-        or result == BuildBinaryResult.Installed
-    ):
-        return result
-
-    return __build_from_github(
-        dir=dir,
-        binary_name=CONFLUX_BINARY,
-        github_url="https://github.com/Conflux-Chain/conflux-rust.git",
-        build_cmd="cargo build --release --bin conflux",
-        compiled_relative_path=["target", "release"],
-    )
-
-
-def build_bsc(dir: str) -> BuildBinaryResult:
-    # Download bsc binary if absent
-    result = __download_from_github(
-        dir=dir,
-        binary_name=BSC_BINARY,
-        github_url="https://api.github.com/repos/bnb-chain/bsc/releases/79485895",
-        asset_name=__asset_name(BSC_BINARY),
-    )
-
-    # Requires to download binary successfully, since it is not ready to build
-    # binary from source code.
-    assert result != BuildBinaryResult.NotInstalled, (
-        "Cannot download binary from github [%s]" % BSC_BINARY
-    )
-
-    return result
 
 
 def build_zg(dir: str) -> BuildBinaryResult:
@@ -90,7 +43,7 @@ def build_zg(dir: str) -> BuildBinaryResult:
     return __build_from_github(
         dir=dir,
         binary_name=ZG_BINARY,
-        github_url="https://github.com/0glabs/0g-chain.git",
+        github_url="https://github.com/0gfoundation/0g-chain.git",
         build_cmd="git fetch origin pull/74/head:pr-74; git checkout pr-74; make install; cp $(go env GOPATH)/bin/0gchaind .",
         compiled_relative_path=[],
     )
@@ -101,7 +54,7 @@ def build_cli(dir: str) -> BuildBinaryResult:
     return __build_from_github(
         dir=dir,
         binary_name=CLIENT_BINARY,
-        github_url="https://github.com/0glabs/0g-storage-client.git",
+        github_url="https://github.com/0gfoundation/0g-storage-client.git",
         build_cmd="go build",
         compiled_relative_path=[],
     )
@@ -223,15 +176,27 @@ def __download_from_github(
 
     req = requests.get(github_url)
     assert req.ok, "Failed to request: %s" % github_url
+    assets = req.json()["assets"]
     download_url = None
-    for asset in req.json()["assets"]:
+    matched_name = None
+    for asset in assets:
         if asset["name"].lower() == asset_name:
             download_url = asset["browser_download_url"]
+            matched_name = asset["name"]
             break
+
+    if download_url is None:
+        download_url, matched_name = __find_asset_fallback(
+            assets=assets,
+            binary_name=binary_name,
+            asset_name=asset_name,
+        )
 
     if download_url is None:
         print(f"Cannot find asset by name {asset_name}", flush=True)
         return BuildBinaryResult.NotInstalled
+    if matched_name is not None and matched_name.lower() != asset_name:
+        print(f"Using asset {matched_name} for {binary_name}", flush=True)
 
     content = requests.get(download_url).content
 
@@ -262,3 +227,34 @@ def __download_from_github(
     )
 
     return BuildBinaryResult.Installed
+
+
+def __find_asset_fallback(assets, binary_name: str, asset_name: str):
+    sys = platform.system().lower()
+    os_keys = {
+        "linux": ["linux", "ubuntu"],
+        "windows": ["windows", "win"],
+        "darwin": ["darwin", "mac", "osx"],
+    }
+    bin_base = binary_name.lower()
+    if bin_base.endswith(".exe"):
+        bin_base = bin_base.removesuffix(".exe")
+    is_zip = asset_name.endswith(".zip")
+
+    candidates = []
+    for asset in assets:
+        name = asset["name"].lower()
+        if is_zip and not name.endswith(".zip"):
+            continue
+        if bin_base not in name:
+            continue
+        if not any(key in name for key in os_keys.get(sys, [])):
+            continue
+        candidates.append((len(name), name, asset))
+
+    if not candidates:
+        return None, None
+
+    candidates.sort()
+    asset = candidates[0][2]
+    return asset["browser_download_url"], asset["name"]
