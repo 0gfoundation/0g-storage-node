@@ -199,11 +199,33 @@ impl TransactionStore {
 
     #[instrument(skip(self))]
     pub fn prune_tx(&self, tx_seq: u64) -> Result<()> {
-        Ok(self.data_kvdb.put(
+        let tx = self
+            .get_tx_by_seq_number(tx_seq)?
+            .ok_or_else(|| anyhow!("prune_tx with tx missing: tx_seq={}", tx_seq))?;
+
+        let mut flow_db_tx = self.flow_kvdb.transaction();
+        let mut data_db_tx = self.data_kvdb.transaction();
+        data_db_tx.put(
             COL_TX_COMPLETED,
             &tx_seq.to_be_bytes(),
             &[TxStatus::Pruned.into()],
-        )?)
+        );
+
+        let mut tx_seq_list = self.get_tx_seq_list_by_data_root(&tx.data_merkle_root)?;
+        tx_seq_list.retain(|seq| *seq != tx_seq);
+        if tx_seq_list.is_empty() {
+            flow_db_tx.delete(COL_TX_DATA_ROOT_INDEX, tx.data_merkle_root.as_bytes());
+        } else {
+            flow_db_tx.put(
+                COL_TX_DATA_ROOT_INDEX,
+                tx.data_merkle_root.as_bytes(),
+                &tx_seq_list.as_ssz_bytes(),
+            );
+        }
+
+        self.data_kvdb.write(data_db_tx)?;
+        self.flow_kvdb.write(flow_db_tx)?;
+        Ok(())
     }
 
     pub fn get_tx_status(&self, tx_seq: u64) -> Result<Option<TxStatus>> {
