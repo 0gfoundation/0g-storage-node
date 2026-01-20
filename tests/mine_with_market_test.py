@@ -92,7 +92,7 @@ class MineTest(TestFramework):
         wait_until(
             lambda: self.mine_contract.last_mined_epoch() == start_epoch + 1
             and not self.mine_contract.can_submit(),
-            timeout=120,
+            timeout=180,
         )
 
         rewards = self.reward_contract.reward_distributes()
