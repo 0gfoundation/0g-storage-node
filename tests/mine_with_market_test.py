@@ -26,7 +26,7 @@ class MineTest(TestFramework):
             "shard_position": "3 / 8",
         }
         self.enable_market = True
-        self.mine_period = int(50 / self.block_time)
+        self.mine_period = max(10, int(10 / self.block_time))
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",

@@ -148,6 +148,8 @@ class TestFramework:
             zgs_node_key_file = None
             if i < len(self.zgs_node_key_files):
                 zgs_node_key_file = self.zgs_node_key_files[i]
+                updated_config = dict(updated_config)
+                updated_config["network_dir"] = os.path.dirname(zgs_node_key_file)
 
             assert os.path.exists(self.zgs_binary), (
                 "%s should be exist" % self.zgs_binary
