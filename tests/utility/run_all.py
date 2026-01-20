@@ -7,10 +7,11 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 
 from utility.build_binary import build_zg, build_cli
+from utility.utils import PORT_RANGE
 
 DEFAULT_PORT_MIN = 11000
 DEFAULT_PORT_MAX = 65535
-DEFAULT_PORT_RANGE = 500
+DEFAULT_PORT_RANGE = PORT_RANGE
 
 
 def print_testcase_result(color, glyph, script, start_time):

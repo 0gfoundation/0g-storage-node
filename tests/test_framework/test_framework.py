@@ -161,7 +161,6 @@ class TestFramework:
                 self.mine_contract.address(),
                 self.reward_contract.address(),
                 self.log,
-                key_file=zgs_node_key_file,
             )
             self.nodes.append(node)
             node.setup_config()
