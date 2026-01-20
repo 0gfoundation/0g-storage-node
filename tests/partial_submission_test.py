@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from test_framework.test_framework import TestFramework
-from utility.submission import create_submission, submit_data, data_to_segments
+from utility.submission import create_submission, data_to_segments
 from utility.utils import wait_until
 
 

@@ -1,4 +1,3 @@
-from gettext import npgettext
 from config.node_config import TX_PARAMS
 from utility.utils import assert_equal
 from copy import copy

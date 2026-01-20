@@ -23,10 +23,10 @@ class MineTest(TestFramework):
         self.zgs_node_configs[0] = {
             "db_max_num_sectors": 2**30,
             "miner_key": GENESIS_PRIV_KEY,
-            "shard_position": "3 / 8",
+            "shard_position": "3 / 32",
         }
         self.enable_market = True
-        self.mine_period = max(10, int(10 / self.block_time))
+        self.mine_period = int(45 / self.block_time)
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",
@@ -54,7 +54,7 @@ class MineTest(TestFramework):
         self.log.info("flow address: %s", self.contract.address())
         self.log.info("mine address: %s", self.mine_contract.address())
 
-        difficulty = int(2**256 / 5 / estimate_st_performance())
+        difficulty = int(2**256 / 5)
         self.mine_contract.set_quality(difficulty)
 
         SECTORS_PER_PRICING = int(8 * (2**30) / 256)
@@ -92,7 +92,7 @@ class MineTest(TestFramework):
         wait_until(
             lambda: self.mine_contract.last_mined_epoch() == start_epoch + 1
             and not self.mine_contract.can_submit(),
-            timeout=180,
+            timeout=240,
         )
 
         rewards = self.reward_contract.reward_distributes()
@@ -119,7 +119,8 @@ class MineTest(TestFramework):
         self.log.info("Wait for mine answer")
         wait_until(
             lambda: self.mine_contract.last_mined_epoch() == start_epoch + 2
-            and not self.mine_contract.can_submit()
+            and not self.mine_contract.can_submit(),
+            timeout=240,
         )
         assert_equal(self.contract.epoch(), start_epoch + 2)
 

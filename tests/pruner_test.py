@@ -2,10 +2,9 @@
 import time
 
 from test_framework.test_framework import TestFramework
-from config.node_config import GENESIS_PRIV_KEY
 from mine_with_market_test import PRICE_PER_SECTOR
 from utility.submission import create_submission, submit_data
-from utility.utils import wait_until, assert_equal, estimate_st_performance
+from utility.utils import wait_until, assert_equal
 
 
 class PrunerTest(TestFramework):

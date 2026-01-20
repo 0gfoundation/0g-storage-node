@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import os
 import time
 
 from config.node_config import ZGS_KEY_FILE, ZGS_NODEID

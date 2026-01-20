@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from test_framework.test_framework import TestFramework
-from config.node_config import MINER_ID, GENESIS_PRIV_KEY
+from config.node_config import GENESIS_PRIV_KEY
 from utility.submission import create_submission, submit_data
 from utility.utils import wait_until, estimate_st_performance
 from test_framework.blockchain_node import BlockChainNodeType
