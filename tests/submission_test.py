@@ -13,7 +13,7 @@ from utility.utils import (
 
 class SubmissionTest(TestFramework):
     def setup_params(self):
-        self.num_blockchain_nodes = 2
+        self.num_blockchain_nodes = 1
         self.num_nodes = 3
 
     def run_test(self):

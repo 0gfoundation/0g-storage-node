@@ -1,0 +1,70 @@
+{
+  "app_name": "0gchaind",
+  "app_version": "v0.2.0-alpha.4-892-g6b920eb40",
+  "genesis_time": "2026-01-19T08:20:21.781649Z",
+  "chain_id": "0gchaind-local",
+  "initial_height": 1,
+  "app_hash": null,
+  "app_state": {
+    "beacon": {
+      "fork_version": "0x05000000",
+      "deposits": [
+        {
+          "pubkey": "0x99b827be22c0aad953d909d48ca5efb1ff5c9058f250a9bc5703219f0ea3a52dd1d8cc4a9108c53ebd3f3863cd8b71d5",
+          "credentials": "0x010000000000000000000000712a30816a8756c8fdb78de63db55aa70d3cf3b4",
+          "amount": "0x38d7ea4c68000",
+          "signature": "0x8ead054d5a1484d6a5d5e3d3f799a4bc3f35a3382a51d0b5838c928f2bdc1ae9635ed7963b0936cd8fb940636eb4bda612f6b72c849e297137e7a9594009342868047a00c1b7e5bbbee26f9ae2f4279a013db907c17c078b20aa91ddd8a7a5dd",
+          "index": 0
+        }
+      ],
+      "execution_payload_header": {
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "feeRecipient": "0x0000000000000000000000000000000000000000",
+        "stateRoot": "0x475099c9d5c04d3a90b8d6958269196857c5b6933f8d5acf1c817c3e65dd5678",
+        "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "blockNumber": "0x0",
+        "gasLimit": "0x3b9aca00",
+        "gasUsed": "0x0",
+        "timestamp": "0x0",
+        "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "baseFeePerGas": "1000000000",
+        "blockHash": "0xba78f08490d6044a3c5bd832a3f535a84f13a35b1b291c59fe5887ed0b414558",
+        "transactionsRoot": "0x7ffe241ea60187fdb0187bfa22de35d1f9bed7ab061d9401fd47e34a54fbede1",
+        "withdrawalsRoot": "0x792930bbd5baac43bcc798ee49aa8185ef76bb3b44ba62b91d86ae569e4bb535",
+        "blobGasUsed": "0x0",
+        "excessBlobGas": "0x0"
+      }
+    }
+  },
+  "consensus": {
+    "params": {
+      "block": {
+        "max_bytes": "104857600",
+        "max_gas": "10000000"
+      },
+      "evidence": {
+        "max_age_num_blocks": "100000",
+        "max_age_duration": "172800000000000",
+        "max_bytes": "1048576"
+      },
+      "validator": {
+        "pub_key_types": [
+          "bls12_381"
+        ]
+      },
+      "version": {
+        "app": "0"
+      },
+      "synchrony": {
+        "precision": "505000000",
+        "message_delay": "15000000000"
+      },
+      "feature": {
+        "vote_extensions_enable_height": "0",
+        "pbts_enable_height": "1"
+      }
+    }
+  }
+}

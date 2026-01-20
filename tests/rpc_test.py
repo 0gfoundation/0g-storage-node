@@ -13,7 +13,7 @@ from utility.utils import (
 
 class RpcTest(TestFramework):
     def setup_params(self):
-        self.num_blockchain_nodes = 2
+        self.num_blockchain_nodes = 1
         self.num_nodes = 2
 
     def run_test(self):
@@ -24,8 +24,6 @@ class RpcTest(TestFramework):
         submissions, data_root = create_submission(chunk_data)
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 1)
-        wait_until(lambda: self.contract.num_submissions(1) == 1)
-        assert_equal(self.contract.num_submissions(), self.contract.num_submissions(1))
 
         wait_until(lambda: client1.zgs_get_file_info(data_root) is not None)
         assert_equal(client1.zgs_get_file_info(data_root)["finalized"], False)

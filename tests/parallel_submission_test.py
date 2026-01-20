@@ -12,7 +12,7 @@ from test_framework.test_framework import TestFramework
 
 class ParallelSubmissionTest(TestFramework):
     def setup_params(self):
-        self.num_blockchain_nodes = 2
+        self.num_blockchain_nodes = 1
         self.num_nodes = 2
 
     def run_test(self):

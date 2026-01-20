@@ -114,9 +114,15 @@ class TestFramework:
             self.log.debug("Wait for 0gchain node to generate first block")
             time.sleep(0.5)
             for node in self.blockchain_nodes:
-                wait_until(
-                    lambda: node.net_peerCount() == self.num_blockchain_nodes - 1
-                )
+                def _peer_count_ok():
+                    peer_count = node.net_peerCount()
+                    if peer_count is None:
+                        return False
+                    if isinstance(peer_count, str):
+                        peer_count = int(peer_count, 16)
+                    return peer_count == self.num_blockchain_nodes - 1
+
+                wait_until(_peer_count_ok)
                 wait_until(lambda: node.eth_blockNumber() is not None)
                 wait_until(lambda: int(node.eth_blockNumber(), 16) > 0)
 

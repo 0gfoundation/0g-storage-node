@@ -119,8 +119,6 @@ class TestNode:
         poll_per_s = 4
         for _ in range(poll_per_s * self.rpc_timeout):
             if self.process.poll() is not None:
-                self.stderr.seek(0)
-                self.stdout.seek(0)
                 raise FailedToStartError(
                     self._node_msg(
                         "exited with status {} during initialization \n\nstderr: {}\n\nstdout: {}\n\n".format(
@@ -255,8 +253,6 @@ class BlockchainNode(TestNode):
         w3.middleware_onion.add(
             SignAndSendRawMiddlewareBuilder.build([account1, account2])
         )
-        # account = w3.eth.account.from_key(GENESIS_PRIV_KEY1)
-        # w3.middleware_onion.add(construct_sign_and_send_raw_middleware(account))
 
         def deploy_contract(name, args=None):
             if args is None:

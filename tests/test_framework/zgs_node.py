@@ -6,9 +6,9 @@ from config.node_config import ZGS_CONFIG, update_config
 from test_framework.blockchain_node import NodeType, TestNode
 from utility.utils import (
     initialize_toml_config,
+    grpc_port,
     p2p_port,
     rpc_port,
-    grpc_port,
     blockchain_rpc_port,
 )
 
@@ -26,7 +26,6 @@ class ZgsNode(TestNode):
         log,
         rpc_timeout=10,
         libp2p_nodes=None,
-        key_file=None,
     ):
         local_conf = ZGS_CONFIG.copy()
         if libp2p_nodes is None:
@@ -52,14 +51,16 @@ class ZgsNode(TestNode):
             "log_contract_address": log_contract_address,
             "mine_contract_address": mine_contract_address,
             "reward_contract_address": reward_contract_address,
-            "blockchain_rpc_endpoint": f"http://127.0.0.1:{blockchain_rpc_port(0)}",
+            "blockchain_rpc_endpoint": os.environ.get(
+                "ZGS_BLOCKCHAIN_RPC_ENDPOINT",
+                f"http://127.0.0.1:{blockchain_rpc_port(0)}",
+            ),
         }
         # Set configs for this specific node.
         update_config(local_conf, indexed_config)
         # Overwrite with personalized configs.
         update_config(local_conf, updated_config)
         data_dir = os.path.join(root_dir, "zgs_node" + str(index))
-        self.key_file = key_file
         rpc_url = "http://" + rpc_listen_address
         super().__init__(
             NodeType.Zgs,
@@ -74,15 +75,9 @@ class ZgsNode(TestNode):
 
     def setup_config(self):
         os.mkdir(self.data_dir)
-
         log_config_path = os.path.join(self.data_dir, self.config["log_config_file"])
         with open(log_config_path, "w") as f:
             f.write("trace,hyper=info,h2=info")
-
-        if self.key_file is not None:
-            network_dir = os.path.join(self.data_dir, "network")
-            os.mkdir(network_dir)
-            shutil.copy(self.key_file, network_dir)
 
         initialize_toml_config(self.config_file, self.config)
 
@@ -103,12 +98,8 @@ class ZgsNode(TestNode):
     def zgs_download_segment(self, data_root, start_index, end_index):
         return self.rpc.zgs_downloadSegment([data_root, start_index, end_index])
 
-    def zgs_download_segment_decoded(
-        self, data_root: str, start_chunk_index: int, end_chunk_index: int
-    ) -> bytes:
-        encodedSegment = self.rpc.zgs_downloadSegment(
-            [data_root, start_chunk_index, end_chunk_index]
-        )
+    def zgs_download_segment_decoded(self, data_root: str, start_chunk_index: int, end_chunk_index: int) -> bytes:
+        encodedSegment = self.rpc.zgs_downloadSegment([data_root, start_chunk_index, end_chunk_index])
         return None if encodedSegment is None else base64.b64decode(encodedSegment)
 
     def zgs_get_file_info(self, data_root):
@@ -117,9 +108,6 @@ class ZgsNode(TestNode):
     def zgs_get_file_info_by_tx_seq(self, tx_seq):
         return self.rpc.zgs_getFileInfoByTxSeq([tx_seq])
 
-    def zgs_get_flow_context(self, tx_seq):
-        return self.rpc.zgs_getFlowContext([tx_seq])
-
     def shutdown(self):
         self.rpc.admin_shutdown()
         self.wait_until_stopped()
@@ -127,12 +115,8 @@ class ZgsNode(TestNode):
     def admin_start_sync_file(self, tx_seq):
         return self.rpc.admin_startSyncFile([tx_seq])
 
-    def admin_start_sync_chunks(
-        self, tx_seq: int, start_chunk_index: int, end_chunk_index: int
-    ):
-        return self.rpc.admin_startSyncChunks(
-            [tx_seq, start_chunk_index, end_chunk_index]
-        )
+    def admin_start_sync_chunks(self, tx_seq: int, start_chunk_index: int, end_chunk_index: int):
+        return self.rpc.admin_startSyncChunks([tx_seq, start_chunk_index, end_chunk_index])
 
     def admin_get_sync_status(self, tx_seq):
         return self.rpc.admin_getSyncStatus([tx_seq])

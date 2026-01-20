@@ -40,13 +40,7 @@ def build_zg(dir: str) -> BuildBinaryResult:
     ):
         return result
 
-    return __build_from_github(
-        dir=dir,
-        binary_name=ZG_BINARY,
-        github_url="https://github.com/0gfoundation/0g-chain.git",
-        build_cmd="git fetch origin pull/74/head:pr-74; git checkout pr-74; make install; cp $(go env GOPATH)/bin/0gchaind .",
-        compiled_relative_path=[],
-    )
+    raise RuntimeError("Failed to download 0gchain binary, make sure the source exists.")
 
 
 def build_cli(dir: str) -> BuildBinaryResult:
@@ -178,25 +172,14 @@ def __download_from_github(
     assert req.ok, "Failed to request: %s" % github_url
     assets = req.json()["assets"]
     download_url = None
-    matched_name = None
     for asset in assets:
         if asset["name"].lower() == asset_name:
             download_url = asset["browser_download_url"]
-            matched_name = asset["name"]
             break
-
-    if download_url is None:
-        download_url, matched_name = __find_asset_fallback(
-            assets=assets,
-            binary_name=binary_name,
-            asset_name=asset_name,
-        )
 
     if download_url is None:
         print(f"Cannot find asset by name {asset_name}", flush=True)
         return BuildBinaryResult.NotInstalled
-    if matched_name is not None and matched_name.lower() != asset_name:
-        print(f"Using asset {matched_name} for {binary_name}", flush=True)
 
     content = requests.get(download_url).content
 
@@ -227,34 +210,3 @@ def __download_from_github(
     )
 
     return BuildBinaryResult.Installed
-
-
-def __find_asset_fallback(assets, binary_name: str, asset_name: str):
-    sys = platform.system().lower()
-    os_keys = {
-        "linux": ["linux", "ubuntu"],
-        "windows": ["windows", "win"],
-        "darwin": ["darwin", "mac", "osx"],
-    }
-    bin_base = binary_name.lower()
-    if bin_base.endswith(".exe"):
-        bin_base = bin_base.removesuffix(".exe")
-    is_zip = asset_name.endswith(".zip")
-
-    candidates = []
-    for asset in assets:
-        name = asset["name"].lower()
-        if is_zip and not name.endswith(".zip"):
-            continue
-        if bin_base not in name:
-            continue
-        if not any(key in name for key in os_keys.get(sys, [])):
-            continue
-        candidates.append((len(name), name, asset))
-
-    if not candidates:
-        return None, None
-
-    candidates.sort()
-    asset = candidates[0][2]
-    return asset["browser_download_url"], asset["name"]
