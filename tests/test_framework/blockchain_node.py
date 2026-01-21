@@ -12,22 +12,16 @@ from config.node_config import (
     TX_PARAMS,
 )
 from utility.simple_rpc_proxy import SimpleRpcProxy
-from utility.utils import initialize_config, wait_until, estimate_st_performance
+from utility.utils import initialize_config, wait_until
 from test_framework.contracts import load_contract_metadata
 
 
 @unique
 class BlockChainNodeType(Enum):
-    Conflux = 0
-    BSC = 1
-    ZG = 2
+    ZG = 0
 
     def block_time(self):
-        if self == BlockChainNodeType.Conflux:
-            return 0.5
-        elif self == BlockChainNodeType.BSC:
-            return 32 / estimate_st_performance()
-        elif self == BlockChainNodeType.ZG:
+        if self == BlockChainNodeType.ZG:
             return 0.5
         else:
             raise AssertionError("Unsupported blockchain type")
@@ -125,8 +119,6 @@ class TestNode:
         poll_per_s = 4
         for _ in range(poll_per_s * self.rpc_timeout):
             if self.process.poll() is not None:
-                self.stderr.seek(0)
-                self.stdout.seek(0)
                 raise FailedToStartError(
                     self._node_msg(
                         "exited with status {} during initialization \n\nstderr: {}\n\nstdout: {}\n\n".format(
@@ -261,8 +253,6 @@ class BlockchainNode(TestNode):
         w3.middleware_onion.add(
             SignAndSendRawMiddlewareBuilder.build([account1, account2])
         )
-        # account = w3.eth.account.from_key(GENESIS_PRIV_KEY1)
-        # w3.middleware_onion.add(construct_sign_and_send_raw_middleware(account))
 
         def deploy_contract(name, args=None):
             if args is None:
@@ -394,7 +384,4 @@ class BlockchainNode(TestNode):
         w3.eth.wait_for_transaction_receipt(tx_hash)
 
     def start(self):
-        super().start(
-            self.blockchain_node_type == BlockChainNodeType.BSC
-            or self.blockchain_node_type == BlockChainNodeType.ZG
-        )
+        super().start(self.blockchain_node_type == BlockChainNodeType.ZG)

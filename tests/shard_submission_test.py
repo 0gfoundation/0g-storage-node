@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
-import time
-
-import base64
 import random
 from test_framework.test_framework import TestFramework
-from utility.submission import ENTRY_SIZE, submit_data
+from utility.submission import submit_data
 from utility.submission import create_submission
-from utility.utils import (
-    assert_equal,
-    wait_until,
-)
+from utility.utils import wait_until
 
 
 class ShardSubmitTest(TestFramework):

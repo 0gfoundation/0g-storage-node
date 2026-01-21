@@ -3,7 +3,7 @@ import time
 
 from test_framework.test_framework import TestFramework
 from mine_with_market_test import PRICE_PER_SECTOR
-from utility.submission import create_submission, submit_data, data_to_segments
+from utility.submission import create_submission, data_to_segments
 from utility.utils import wait_until, assert_equal
 
 

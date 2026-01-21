@@ -233,8 +233,16 @@ impl MemoryChunkPool {
             .await
             .segment_cache
             .remove_file(&tx.data_merkle_root);
+        debug!(
+            "update_file_info: found cached file: {}",
+            maybe_file.is_some()
+        );
         if let Some(mut file) = maybe_file {
             file.update_with_tx(tx);
+            debug!(
+                "update_file_info: after update_with_tx, tx_id: {:?}",
+                file.segments.keys().collect::<Vec<_>>()
+            );
             for (seg_index, (seg, proof)) in file.segments.into_iter() {
                 self.write_chunks(
                     SegmentInfo {

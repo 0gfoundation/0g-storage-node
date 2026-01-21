@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import time
 
 from config.node_config import ZGS_KEY_FILE, ZGS_NODEID
 from test_framework.test_framework import TestFramework
-from utility.utils import p2p_port
+from utility.utils import arrange_port, PortCategory
 
 
 class NetworkTcpShardTest(TestFramework):
@@ -19,7 +18,7 @@ class NetworkTcpShardTest(TestFramework):
 
         # setup for node 0 as bootnode
         self.zgs_node_key_files = [ZGS_KEY_FILE]
-        bootnode_port = p2p_port(0)
+        bootnode_port = arrange_port(PortCategory.ZGS_P2P, 0)
         self.zgs_node_configs[0] = {
             # enable UDP discovery relevant configs
             "network_enr_address": "127.0.0.1",
@@ -37,8 +36,8 @@ class NetworkTcpShardTest(TestFramework):
             self.zgs_node_configs[i] = {
                 # enable UDP discovery relevant configs
                 "network_enr_address": "127.0.0.1",
-                "network_enr_tcp_port": p2p_port(i),
-                "network_enr_udp_port": p2p_port(i),
+                "network_enr_tcp_port": arrange_port(PortCategory.ZGS_P2P, i),
+                "network_enr_udp_port": arrange_port(PortCategory.ZGS_P2P, i),
                 # disable trusted nodes and enable bootnodes
                 "network_libp2p_nodes": [],
                 "network_boot_nodes": bootnodes,

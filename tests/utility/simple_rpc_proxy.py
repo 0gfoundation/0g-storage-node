@@ -20,7 +20,11 @@ class RpcCaller:
     def __call__(self, *args, **argsn):
         r = request(self.method, *args)
         try:
-            response = requests.post(self.url, json=r, timeout=self.timeout)
+            response = requests.post(
+                self.url,
+                json=r,
+                timeout=self.timeout,
+            )
             parsed = parse(response.json())
             if isinstance(parsed, Ok):
                 return parsed.result
