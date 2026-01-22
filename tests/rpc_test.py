@@ -2,7 +2,7 @@
 
 import tempfile
 
-from config.node_config import GENESIS_ACCOUNT
+from config.node_config import GENESIS_ACCOUNT, TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import create_submission, submit_data
 from utility.utils import (
@@ -21,7 +21,7 @@ class RpcTest(TestFramework):
         client2 = self.nodes[1]
 
         chunk_data = b"\x00" * 256
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 1)
 
@@ -62,7 +62,6 @@ class RpcTest(TestFramework):
 
             root = self._upload_file_use_cli(
                 self.blockchain_nodes[0].rpc_url,
-                self.contract.address(),
                 GENESIS_ACCOUNT.key,
                 self.nodes[0].rpc_url,
                 file_to_upload,

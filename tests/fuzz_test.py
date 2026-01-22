@@ -31,12 +31,13 @@ class FuzzTest(TestFramework):
                 log.info("submission %s, data size: %s", i, v)
 
                 chunk_data = random.randbytes(v)
-                submissions, data_root = create_submission(chunk_data)
 
                 account_lock.acquire()
-                account_idx = random.randint(0, len(accounts) - 1)
-                contract.submit(submissions, tx_prarams=accounts[account_idx])
+                account = random.choice(accounts)
                 account_lock.release()
+
+                submissions, data_root = create_submission(chunk_data, account['from'])
+                contract.submit(submissions, tx_prarams=account)
 
                 lock.acquire()
                 client_idx = random.randint(0, len(nodes_index) - 1)

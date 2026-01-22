@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import random
+from config.node_config import TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import submit_data
 from utility.submission import create_submission
@@ -48,7 +49,7 @@ class SubmissionTest(TestFramework):
                 next_tx_seq += 1
 
     def submit_tx_for_data(self, chunk_data, tx_seq, data_finalized=False, node_idx=0):
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.log.info("data root: %s, submissions: %s", data_root, submissions)
         self.contract.submit(submissions)
 
@@ -62,7 +63,7 @@ class SubmissionTest(TestFramework):
         )
 
     def submit_data(self, chunk_data, node_idx=0):
-        _, data_root = create_submission(chunk_data)
+        _, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         client = self.nodes[node_idx]
         segments = submit_data(client, chunk_data)
         self.log.debug(

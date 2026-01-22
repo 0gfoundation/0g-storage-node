@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from config.node_config import TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import create_submission, submit_data
 from utility.utils import wait_until
@@ -13,7 +14,7 @@ class CrashTest(TestFramework):
     def run_test(self):
         # 1. all nodes are running
         chunk_data = b"\x01" * 256
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 1)
         wait_until(lambda: self.nodes[0].zgs_get_file_info(data_root) is not None)
@@ -37,7 +38,7 @@ class CrashTest(TestFramework):
             self.nodes[i].stop(kill=True)
 
         chunk_data = b"\x02" * 256 * 1024
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 2)
         wait_until(lambda: self.nodes[0].zgs_get_file_info(data_root) is not None)
@@ -72,7 +73,7 @@ class CrashTest(TestFramework):
         self.nodes[0].wait_for_rpc_connection()
 
         chunk_data = b"\x03" * 256
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 3)
         wait_until(lambda: self.nodes[0].zgs_get_file_info(data_root) is not None)
@@ -98,7 +99,7 @@ class CrashTest(TestFramework):
         self.nodes[0].wait_for_rpc_connection()
 
         chunk_data = b"\x04" * 256 * 1561
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 4)
         wait_until(lambda: self.nodes[0].zgs_get_file_info(data_root) is not None)
@@ -107,7 +108,7 @@ class CrashTest(TestFramework):
             self.nodes[i].stop(kill=True)
 
         chunk_data1 = b"\x05" * 256
-        submissions1, data_root1 = create_submission(chunk_data1)
+        submissions1, data_root1 = create_submission(chunk_data1, TX_PARAMS['from'])
         self.contract.submit(submissions1)
         wait_until(lambda: self.contract.num_submissions() == 5)
         wait_until(lambda: self.nodes[0].zgs_get_file_info(data_root1) is not None)

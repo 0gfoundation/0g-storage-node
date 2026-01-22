@@ -3,6 +3,7 @@
 import random
 import threading
 
+from config.node_config import TX_PARAMS
 from utility.submission import create_submission, submit_data
 from utility.utils import (
     wait_until,
@@ -51,8 +52,8 @@ class ParallelSubmissionTest(TestFramework):
         res = []
         for _ in range(num):
             chunk_data = random.randbytes(size)
-            submission = create_submission(chunk_data)
-            res.append((submission[0], submission[1], chunk_data))
+            submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
+            res.append((submissions, data_root, chunk_data))
 
         return res
 

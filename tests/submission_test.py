@@ -2,6 +2,7 @@
 
 import base64
 import random
+from config.node_config import TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import ENTRY_SIZE, submit_data
 from utility.submission import create_submission
@@ -44,7 +45,7 @@ class SubmissionTest(TestFramework):
         self.log.info("node index: %d, file size: %d", node_idx, size)
         chunk_data = random.randbytes(size) if rand_data else b"\x10" * size
 
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.log.info("data root: %s, submissions: %s", data_root, submissions)
         self.contract.submit(submissions)
 

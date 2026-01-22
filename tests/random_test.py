@@ -2,6 +2,7 @@
 
 import random
 
+from config.node_config import TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import create_submission
 from utility.submission import submit_data
@@ -39,7 +40,7 @@ class RandomTest(TestFramework):
 
             client = self.nodes[chosen_node]
             chunk_data = random.randbytes(size)
-            submissions, data_root = create_submission(chunk_data)
+            submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
             self.contract.submit(submissions)
             wait_until(lambda: self.contract.num_submissions() == i + 1)
             wait_until(
