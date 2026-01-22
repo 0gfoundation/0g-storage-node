@@ -23,10 +23,10 @@ class MineTest(TestFramework):
         self.zgs_node_configs[0] = {
             "db_max_num_sectors": 2**30,
             "miner_key": GENESIS_PRIV_KEY,
-            "shard_position": "3 / 32",
+            "shard_position": "3 / 256",
         }
         self.enable_market = True
-        self.mine_period = int(45 / self.block_time)
+        self.mine_period = 60
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",
@@ -53,9 +53,6 @@ class MineTest(TestFramework):
 
         self.log.info("flow address: %s", self.contract.address())
         self.log.info("mine address: %s", self.mine_contract.address())
-
-        difficulty = int(2**256 / 5)
-        self.mine_contract.set_quality(difficulty)
 
         SECTORS_PER_PRICING = int(8 * (2**30) / 256)
 

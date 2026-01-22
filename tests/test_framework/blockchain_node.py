@@ -22,7 +22,7 @@ class BlockChainNodeType(Enum):
 
     def block_time(self):
         if self == BlockChainNodeType.ZG:
-            return 0.5
+            return 1
         else:
             raise AssertionError("Unsupported blockchain type")
 
@@ -258,7 +258,7 @@ class BlockchainNode(TestNode):
             1,  # difficulty
             mine_period,  # targetMineBlocks
             2,  # targetSubmissions
-            4,  # maxShards
+            256,  # maxShards
             1,  # nSubtasks
             1,  # subtaskInterval
         )

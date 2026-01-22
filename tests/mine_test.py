@@ -13,7 +13,7 @@ class MineTest(TestFramework):
         self.zgs_node_configs[0] = {
             "miner_key": GENESIS_PRIV_KEY,
         }
-        self.mine_period = int(45 / self.block_time)
+        self.mine_period = 60
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",
@@ -47,10 +47,7 @@ class MineTest(TestFramework):
             first_block + self.mine_period,
         )
         wait_until(lambda: self.contract.epoch() >= 1, timeout=180)
-
-        quality = int(2**256 / 100 / estimate_st_performance())
-        self.mine_contract.set_quality(quality)
-
+        
         self.log.info("Submit the first data chunk")
         self.submit_data(b"\x11", 2000)
 

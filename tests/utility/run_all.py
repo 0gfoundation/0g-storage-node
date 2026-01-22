@@ -135,6 +135,18 @@ def run_all(
         py = "python"
 
     i = 0
+    # Run single tests one by one
+    for script in single_run_tests:
+        f = executor.submit(
+            run_single_test, py, script, test_dir, i, options.port_min, options.port_max
+        )
+        try:
+            f.result()
+        except subprocess.CalledProcessError as err:
+            print("CalledProcessError " + repr(err))
+            failed.add(script)
+        i += 1
+
     # Start slow tests first to avoid waiting for long-tail jobs
     for script in slow_tests:
         f = executor.submit(
@@ -142,6 +154,7 @@ def run_all(
         )
         test_results.append((script, f))
         i += 1
+
     for script in TEST_SCRIPTS:
         f = executor.submit(
             run_single_test, py, script, test_dir, i, options.port_min, options.port_max
@@ -156,18 +169,6 @@ def run_all(
         except subprocess.CalledProcessError as err:
             print("CalledProcessError " + repr(err))
             failed.add(script)
-
-    # Run single tests one by one
-    for script in single_run_tests:
-        f = executor.submit(
-            run_single_test, py, script, test_dir, i, options.port_min, options.port_max
-        )
-        try:
-            f.result()
-        except subprocess.CalledProcessError as err:
-            print("CalledProcessError " + repr(err))
-            failed.add(script)
-        i += 1
 
     print("Elapsed: " + str(int(time.time() - start_time)) + " seconds", flush=True)
 
