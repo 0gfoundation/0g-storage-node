@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from test_framework.test_framework import TestFramework
-from config.node_config import GENESIS_PRIV_KEY
+from config.node_config import GENESIS_PRIV_KEY, TX_PARAMS
 from utility.submission import create_submission, submit_data
 from utility.utils import wait_until, estimate_st_performance
 from test_framework.blockchain_node import BlockChainNodeType
@@ -13,7 +13,7 @@ class MineTest(TestFramework):
         self.zgs_node_configs[0] = {
             "miner_key": GENESIS_PRIV_KEY,
         }
-        self.mine_period = int(45 / self.block_time)
+        self.mine_period = 60
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",
@@ -25,7 +25,7 @@ class MineTest(TestFramework):
         submissions_before = self.contract.num_submissions()
         client = self.nodes[0]
         chunk_data = item * 256 * size
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == submissions_before + 1)
         wait_until(lambda: client.zgs_get_file_info(data_root) is not None)
@@ -47,10 +47,7 @@ class MineTest(TestFramework):
             first_block + self.mine_period,
         )
         wait_until(lambda: self.contract.epoch() >= 1, timeout=180)
-
-        quality = int(2**256 / 100 / estimate_st_performance())
-        self.mine_contract.set_quality(quality)
-
+        
         self.log.info("Submit the first data chunk")
         self.submit_data(b"\x11", 2000)
 

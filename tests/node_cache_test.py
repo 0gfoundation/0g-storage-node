@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from config.node_config import TX_PARAMS
 from test_framework.test_framework import TestFramework
 from utility.submission import create_submission, submit_data
 from utility.utils import wait_until
@@ -15,7 +16,7 @@ class NodeCacheTest(TestFramework):
         client = self.nodes[0]
 
         chunk_data = b"\x02" * 256 * 1024 * 1024 * 3
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 1)
         wait_until(lambda: client.zgs_get_file_info(data_root) is not None)
@@ -29,7 +30,7 @@ class NodeCacheTest(TestFramework):
         self.nodes[0].wait_for_rpc_connection()
 
         chunk_data = b"\x03" * 256 * (1024 * 765 + 5)
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == 2)
         wait_until(lambda: client.zgs_get_file_info(data_root) is not None)

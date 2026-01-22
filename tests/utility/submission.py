@@ -29,12 +29,11 @@ def bytes_to_entries(size_bytes):
     else:
         return size_bytes // ENTRY_SIZE + 1
 
-
-def create_submission(data):
-    submission = []
-    submission.append(len(data))
-    submission.append(b"")
-    submission.append([])
+def create_submission(data, submitter):
+    submission_data = []
+    submission_data.append(len(data))
+    submission_data.append(b"")
+    submission_data.append([])
 
     offset = 0
     nodes = []
@@ -43,7 +42,7 @@ def create_submission(data):
         nodes.append(node_hash)
 
         height = int(log2(chunks))
-        submission[2].append([decode_hex(node_hash.decode("utf-8")), height])
+        submission_data[2].append([decode_hex(node_hash.decode("utf-8")), height])
         offset += chunks * ENTRY_SIZE
 
     root_hash = nodes[-1]
@@ -53,8 +52,8 @@ def create_submission(data):
         tree.add_leaf(Leaf(root_hash))
         root_hash = tree.get_root_hash()
 
+    submission = [submission_data, submitter]
     return submission, add_0x_prefix(root_hash.decode("utf-8"))
-
 
 def split_nodes(data_len):
     nodes = []

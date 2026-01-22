@@ -22,7 +22,7 @@ class BlockChainNodeType(Enum):
 
     def block_time(self):
         if self == BlockChainNodeType.ZG:
-            return 0.5
+            return 1
         else:
             raise AssertionError("Unsupported blockchain type")
 
@@ -254,6 +254,15 @@ class BlockchainNode(TestNode):
             SignAndSendRawMiddlewareBuilder.build([account1, account2])
         )
 
+        mine_init_params = (
+            1,  # difficulty
+            mine_period,  # targetMineBlocks
+            2,  # targetSubmissions
+            256,  # maxShards
+            1,  # nSubtasks
+            1,  # subtaskInterval
+        )
+
         def deploy_contract(name, args=None):
             if args is None:
                 args = []
@@ -291,10 +300,8 @@ class BlockchainNode(TestNode):
             self.log.debug("Mine deployed")
 
             mine_contract.functions.initialize(
-                1, flow_contract.address, dummy_reward_contract.address
+                flow_contract.address, dummy_reward_contract.address, mine_init_params
             ).transact(TX_PARAMS)
-            mine_contract.functions.setDifficultyAdjustRatio(1).transact(TX_PARAMS)
-            mine_contract.functions.setTargetSubmissions(2).transact(TX_PARAMS)
             self.log.debug("Mine Initialized")
 
             flow_initialize_hash = flow_contract.functions.initialize(
@@ -333,10 +340,8 @@ class BlockchainNode(TestNode):
             self.log.debug("Flow deployed")
 
             mine_contract.functions.initialize(
-                1, flow_contract.address, reward_contract.address
+                flow_contract.address, reward_contract.address, mine_init_params
             ).transact(TX_PARAMS)
-            mine_contract.functions.setDifficultyAdjustRatio(1).transact(TX_PARAMS)
-            mine_contract.functions.setTargetSubmissions(2).transact(TX_PARAMS)
             self.log.debug("Mine Initialized")
 
             market_contract.functions.initialize(
@@ -347,7 +352,7 @@ class BlockchainNode(TestNode):
             self.log.debug("Market Initialized")
 
             reward_contract.functions.initialize(
-                market_contract.address, mine_contract.address
+                market_contract.address, mine_contract.address, TX_PARAMS['from']
             ).transact(TX_PARAMS)
             reward_contract.functions.setBaseReward(10**18).transact(TX_PARAMS)
             self.log.debug("Reward Initialized")

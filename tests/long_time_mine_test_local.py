@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from test_framework.test_framework import TestFramework
-from config.node_config import MINER_ID, GENESIS_PRIV_KEY
+from config.node_config import MINER_ID, GENESIS_PRIV_KEY, TX_PARAMS
 from utility.submission import create_submission, submit_data
 from utility.utils import wait_until
 
@@ -22,7 +22,7 @@ class LongTimeMineTest(TestFramework):
         submissions_before = self.contract.num_submissions()
         client = self.nodes[0]
         chunk_data = item * 256 * size
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         self.contract.submit(submissions)
         wait_until(lambda: self.contract.num_submissions() == submissions_before + 1)
         wait_until(lambda: client.zgs_get_file_info(data_root) is not None)

@@ -29,7 +29,7 @@ deposit-contract-address = "0x4242424242424242424242424242424242424242"
 max-deposits-per-block = 16
 deposit-eth1-chain-id = 16601
 eth1-follow-distance = 1
-target-seconds-per-eth1-block = 2
+target-seconds-per-eth1-block = 1
 
 # Fork-related values
 genesis-time = 0

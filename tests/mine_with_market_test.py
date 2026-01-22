@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from test_framework.test_framework import TestFramework
-from config.node_config import MINER_ID, GENESIS_PRIV_KEY
+from config.node_config import MINER_ID, GENESIS_PRIV_KEY, TX_PARAMS
 from utility.submission import create_submission, submit_data
 from utility.utils import (
     wait_until,
@@ -23,10 +23,10 @@ class MineTest(TestFramework):
         self.zgs_node_configs[0] = {
             "db_max_num_sectors": 2**30,
             "miner_key": GENESIS_PRIV_KEY,
-            "shard_position": "3 / 32",
+            "shard_position": "3 / 256",
         }
         self.enable_market = True
-        self.mine_period = int(45 / self.block_time)
+        self.mine_period = 60
         self.launch_wait_seconds = 15
         self.log.info(
             "Contract Info: Est. block time %.2f, Mine period %d",
@@ -38,7 +38,7 @@ class MineTest(TestFramework):
         submissions_before = self.contract.num_submissions()
         client = self.nodes[0]
         chunk_data = item * 256 * size
-        submissions, data_root = create_submission(chunk_data)
+        submissions, data_root = create_submission(chunk_data, TX_PARAMS['from'])
         value = int(size * PRICE_PER_SECTOR * 1.1)
         self.contract.submit(submissions, tx_prarams={"value": value})
         wait_until(lambda: self.contract.num_submissions() == submissions_before + 1)
@@ -53,9 +53,6 @@ class MineTest(TestFramework):
 
         self.log.info("flow address: %s", self.contract.address())
         self.log.info("mine address: %s", self.mine_contract.address())
-
-        difficulty = int(2**256 / 5)
-        self.mine_contract.set_quality(difficulty)
 
         SECTORS_PER_PRICING = int(8 * (2**30) / 256)
 
