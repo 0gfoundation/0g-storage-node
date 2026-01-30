@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 pub struct PoraService {
     mine_context_receiver: broadcast::Receiver<MineContextMessage>,
-    mine_answer_sender: mpsc::UnboundedSender<AnswerWithoutProof>,
+    mine_answer_sender: mpsc::Sender<AnswerWithoutProof>,
     msg_recv: broadcast::Receiver<MinerMessage>,
     loader: Arc<dyn PoraLoader>,
 
@@ -123,9 +123,8 @@ impl PoraService {
         loader: Arc<dyn PoraLoader>,
         config: &MinerConfig,
         miner_id: H256,
-    ) -> mpsc::UnboundedReceiver<AnswerWithoutProof> {
-        let (mine_answer_sender, mine_answer_receiver) =
-            mpsc::unbounded_channel::<AnswerWithoutProof>();
+    ) -> mpsc::Receiver<AnswerWithoutProof> {
+        let (mine_answer_sender, mine_answer_receiver) = mpsc::channel::<AnswerWithoutProof>(20);
         let mine_range = MineRangeConfig {
             start_position: Some(0),
             end_position: Some(u64::MAX),
@@ -218,7 +217,7 @@ impl PoraService {
 
                     if let Some(answer) = miner.batch_iteration(nonce, self.iter_batch).await {
                         info!("Hit Pora answer {:?}", answer);
-                        if self.mine_answer_sender.send(answer).is_err() {
+                        if self.mine_answer_sender.send(answer).await.is_err() {
                             warn!("Mine submitter channel closed");
                         }
                     } else if cpu_percent < 100 {
