@@ -18,6 +18,8 @@ use crate::{
 
 use std::sync::Arc;
 
+const MINE_ANSWER_CHANNEL_CAPACITY: usize = 20;
+
 pub struct PoraService {
     mine_context_receiver: broadcast::Receiver<MineContextMessage>,
     mine_answer_sender: mpsc::Sender<AnswerWithoutProof>,
@@ -124,7 +126,8 @@ impl PoraService {
         config: &MinerConfig,
         miner_id: H256,
     ) -> mpsc::Receiver<AnswerWithoutProof> {
-        let (mine_answer_sender, mine_answer_receiver) = mpsc::channel::<AnswerWithoutProof>(20);
+        let (mine_answer_sender, mine_answer_receiver) =
+            mpsc::channel::<AnswerWithoutProof>(MINE_ANSWER_CHANNEL_CAPACITY);
         let mine_range = MineRangeConfig {
             start_position: Some(0),
             end_position: Some(u64::MAX),
