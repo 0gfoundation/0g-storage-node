@@ -18,7 +18,7 @@ use crate::watcher::MineContextMessage;
 use zgs_spec::{BYTES_PER_SEAL, SECTORS_PER_SEAL};
 
 pub struct Submitter {
-    mine_answer_receiver: mpsc::UnboundedReceiver<AnswerWithoutProof>,
+    mine_answer_receiver: mpsc::Receiver<AnswerWithoutProof>,
     mine_context_receiver: broadcast::Receiver<MineContextMessage>,
     mine_contract: PoraMine<MineServiceMiddleware>,
     flow_contract: ZgsFlow<Provider<RetryClient<Http>>>,
@@ -29,7 +29,7 @@ pub struct Submitter {
 impl Submitter {
     pub fn spawn(
         executor: TaskExecutor,
-        mine_answer_receiver: mpsc::UnboundedReceiver<AnswerWithoutProof>,
+        mine_answer_receiver: mpsc::Receiver<AnswerWithoutProof>,
         mine_context_receiver: broadcast::Receiver<MineContextMessage>,
         provider: Arc<Provider<RetryClient<Http>>>,
         signing_provider: Arc<MineServiceMiddleware>,
