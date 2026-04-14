@@ -31,7 +31,7 @@ class CrashTest(TestFramework):
             self.log.info("wait for node: %s", i)
             wait_until(lambda: self.nodes[i].zgs_get_file_info(data_root)["finalized"])
 
-        # 2: first node runnging, other nodes killed
+        # 2: first node running, other nodes killed
         self.log.info("kill node")
         # kill node to simulate node crash
         for i in range(1, self.num_nodes):
@@ -66,7 +66,7 @@ class CrashTest(TestFramework):
 
             wait_until(lambda: self.nodes[i].zgs_get_file_info(data_root)["finalized"])
 
-        # 4: node[1..] synced contract entries and killed
+        # 3: node[1..] synced contract entries and killed
         self.log.info("kill node 0")
         self.nodes[0].stop(kill=True)
         self.start_storage_node(0)
@@ -93,7 +93,7 @@ class CrashTest(TestFramework):
             self.nodes[i].admin_start_sync_file(2)
             wait_until(lambda: self.nodes[i].zgs_get_file_info(data_root)["finalized"])
 
-        # 5: node[1..] synced contract entries and killed, sync disorder
+        # 4: node[1..] synced contract entries and killed, sync disorder
         self.nodes[0].stop(kill=True)
         self.start_storage_node(0)
         self.nodes[0].wait_for_rpc_connection()
