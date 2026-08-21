@@ -216,6 +216,17 @@ impl ZgsConfig {
         let mut router_config = self.router.clone();
         router_config.libp2p_nodes = network_config.libp2p_nodes.to_vec();
 
+        // Peers reject an AnnounceFile carrying more than MAX_ANNOUNCE_FILE_TX_IDS entries and
+        // score the sender down for it. Batching above that limit would get this node
+        // penalised network-wide, so fail here rather than at every peer.
+        if router_config.batcher_file_capacity > router::MAX_ANNOUNCE_FILE_TX_IDS {
+            return Err(format!(
+                "batcher_file_capacity {} exceeds the protocol limit of {} tx_ids per AnnounceFile",
+                router_config.batcher_file_capacity,
+                router::MAX_ANNOUNCE_FILE_TX_IDS,
+            ));
+        }
+
         if router_config.public_address.is_none() {
             if let Some(addr) = &self.network_enr_address {
                 router_config.public_address = Some(addr.parse().unwrap());
