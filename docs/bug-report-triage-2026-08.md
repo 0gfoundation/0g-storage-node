@@ -10,12 +10,12 @@ same findings do not get re-triaged from scratch next time a similar report arri
 
 | Verdict | Count | Findings |
 | --- | --- | --- |
-| Fixed | 8 | 2, 5, 6, 7, 9, 22, 27, plus one the report missed |
-| Filed, not patched | 2 | 9 (durability half), 13 |
-| Not worth fixing | 17 | 1, 3, 4, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19, 21, 23, 24, 25, 26 |
+| Fixed | 7 | 5, 6, 7, 9, 22, 27, plus one the report missed |
+| Filed, not patched | 3 | 9 (durability half), 13, and a new one the cap exposed |
+| Not worth fixing | 18 | 1, 2, 3, 4, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19, 21, 23, 24, 25, 26 |
 | False | 1 | 20 |
 
-Issues #419–426, #435. PRs #427–434.
+Issues #419–426, #435, #437. PRs #427–434, #436.
 
 ## Findings we are not fixing
 
@@ -32,6 +32,24 @@ unwritable while the process otherwise runs.
 The usual suggested fix also makes things worse: returning `Err` on an unreadable or invalid key file
 turns "regenerate and carry on" into "refuses to boot until an operator deletes the file."
 
+### 2 — enr.dat is written non-atomically
+
+Real. `File::create` truncates before writing, so a crash mid-write leaves a partial `enr.dat`, which
+fails `Enr::from_str` and regenerates the ENR at seq 1. Peers cannot correct a seq regression — discv5
+only ever requests an ENR whose seq is *higher* than its cached copy, and a node discards any record
+of itself — so the stale entry clears only when liveness checks evict it.
+
+We wrote the temp-write + fsync + rename fix and then closed it (#433). The write is ~300 bytes and
+happens about once per boot: startup, the two `update_enr_*` calls, and `SocketUpdated`, which fires
+only when the IP majority vote actually changes. The torn-write window is microseconds and needs a
+power loss or SIGKILL inside it. The consequence is usually invisible: the seq-1 record only matters
+if the advertised address also changed in the same restart, since otherwise the cached higher-seq
+record carries identical ip/tcp/udp.
+
+It also sat badly beside our own decision on 3. If regeneration is self-healing enough to prefer over
+a hard startup failure, hardening against the corruption that causes regeneration is not worth a
+temp file and an fsync.
+
 ### 3 — Transient ENR read failure overwrites a newer persisted ENR
 
 Real but narrow. `if let Ok(...) = File::open` collapses "absent" and "unreadable" into one branch.
@@ -42,9 +60,9 @@ a torn write of base64 text is still valid UTF-8. If `File::open` fails on permi
 `File::create` fails too, so the file is not destroyed. The ENR also sits in the same directory as
 `network/key`; a case where the key reads fine but the ENR does not is contrived.
 
-We fixed the atomicity half in #425 instead. We deliberately did **not** make an unreadable `enr.dat`
-a hard startup failure — an ENR is trivially regenerable from the key, so that trades a self-healing
-annoyance for a guaranteed outage.
+We deliberately did **not** make an unreadable `enr.dat` a hard startup failure — an ENR is trivially
+regenerable from the key, so that trades a self-healing annoyance for a guaranteed outage. See 2 for
+why we did not harden the write side either.
 
 ### 4 — Top-level `ZGS_NODE__...` environment overrides are discarded
 
@@ -178,6 +196,16 @@ The defect is real: `update_timeout` resets the expiration but never rewrites `M
 
 No caller exists. The only consumer of the crate is `peer_manager`, which uses `insert`, `remove` and
 `poll_next_unpin` only. The apparent second consumer in `version-meld/discv5` uses its own local copy.
+
+## Found while triaging, not in the report
+
+**`FileLocationCache::insert` is O(N²)** (#437). It clones the whole `SignedAnnounceFile` — including
+its full `tx_ids` Vec — once per tx_id, so one AnnounceFile with N entries allocates N copies of an
+N-element list. `max_entries_total` counts announcements rather than bytes, so it does not bound this.
+At the 10 MB decompressed gossip ceiling a single signed message allocates terabytes and OOMs the node.
+
+#431 caps incoming `tx_ids` at 256, which bounds the blast radius to ~2.6 MB per message but leaves
+the quadratic behaviour in place.
 
 ## Client-side findings
 
