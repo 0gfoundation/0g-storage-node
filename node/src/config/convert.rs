@@ -179,7 +179,26 @@ impl ZgsConfig {
         } else {
             None
         };
-        let cpu_percentage = self.miner_cpu_percentage;
+        // `Miner::start` gates the whole mining branch on `cpu_percent > 0`, so a zero here
+        // silently disables mining on a node that is otherwise fully configured to mine -
+        // no log line, no metric, nothing to notice until the rewards stop.
+        if self.miner_cpu_percentage == 0 {
+            return Err(
+                "miner_cpu_percentage must be greater than 0; remove miner_key to disable mining"
+                    .into(),
+            );
+        }
+        // Values above 100 skip the throttle branch entirely and mine at full speed. That is
+        // the sane reading of "150% CPU", but say so rather than ignoring the number.
+        let cpu_percentage = if self.miner_cpu_percentage > 100 {
+            warn!(
+                configured = self.miner_cpu_percentage,
+                "miner_cpu_percentage above 100 has no additional effect, treating as 100"
+            );
+            100
+        } else {
+            self.miner_cpu_percentage
+        };
         let iter_batch = self.mine_iter_batch_size;
         let context_query_seconds = self.mine_context_query_seconds;
 
