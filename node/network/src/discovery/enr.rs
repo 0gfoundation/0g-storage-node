@@ -150,12 +150,33 @@ pub fn load_enr_from_disk(dir: &Path) -> Result<Enr, String> {
     }
 }
 
-/// Saves an ENR to disk
-pub fn save_enr_to_disk(dir: &Path, enr: &Enr) {
-    let _ = std::fs::create_dir_all(dir);
-    match File::create(dir.join(Path::new(ENR_FILENAME)))
-        .and_then(|mut f| f.write_all(enr.to_base64().as_bytes()))
+/// Saves an ENR to disk.
+///
+/// Writes to a temporary file and renames it into place. `File::create` truncates before
+/// writing, so a crash mid-write used to leave a partial `enr.dat`. That file is still
+/// valid UTF-8 - it is base64 text - so it survives `read_to_string` and fails only at
+/// `Enr::from_str`, where `use_or_load_enr` discards it and regenerates from seq 1.
+/// Peers that cached the previous, higher-seq record then ignore the new one: discv5 only
+/// ever asks for an ENR whose seq is *higher* than its cached copy, and a node drops any
+/// record of itself, so nothing corrects the regression and the stale entry clears only
+/// when liveness checks evict it.
+fn write_enr_to_disk(dir: &Path, enr: &Enr) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+
+    let enr_path = dir.join(ENR_FILENAME);
+    let tmp_path = dir.join(format!("{}.tmp", ENR_FILENAME));
+
     {
+        let mut file = File::create(&tmp_path)?;
+        file.write_all(enr.to_base64().as_bytes())?;
+        file.sync_all()?;
+    }
+
+    std::fs::rename(&tmp_path, &enr_path)
+}
+
+pub fn save_enr_to_disk(dir: &Path, enr: &Enr) {
+    match write_enr_to_disk(dir, enr) {
         Ok(_) => {
             debug!("ENR written to disk");
         }
@@ -166,5 +187,51 @@ pub fn save_enr_to_disk(dir: &Path, enr: &Enr) {
                 "Could not write ENR to file",
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use discv5::enr::EnrBuilder;
+
+    fn test_enr() -> (Enr, CombinedKey) {
+        let key = CombinedKey::generate_secp256k1();
+        let enr = EnrBuilder::new("v4").build(&key).unwrap();
+        (enr, key)
+    }
+
+    #[test]
+    fn save_enr_round_trips() {
+        let dir = tempfile::tempdir().unwrap();
+        let (enr, _key) = test_enr();
+
+        save_enr_to_disk(dir.path(), &enr);
+
+        assert_eq!(load_enr_from_disk(dir.path()).unwrap(), enr);
+    }
+
+    #[test]
+    fn save_enr_leaves_no_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let (enr, _key) = test_enr();
+
+        save_enr_to_disk(dir.path(), &enr);
+
+        assert!(!dir.path().join(format!("{}.tmp", ENR_FILENAME)).exists());
+    }
+
+    /// The rename must replace an existing record wholesale rather than truncate-and-write,
+    /// so a shorter new value cannot leave trailing bytes from the longer old one.
+    #[test]
+    fn save_enr_overwrites_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (first, _k1) = test_enr();
+        let (second, _k2) = test_enr();
+
+        save_enr_to_disk(dir.path(), &first);
+        save_enr_to_disk(dir.path(), &second);
+
+        assert_eq!(load_enr_from_disk(dir.path()).unwrap(), second);
     }
 }
