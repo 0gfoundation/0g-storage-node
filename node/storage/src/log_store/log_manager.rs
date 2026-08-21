@@ -110,8 +110,8 @@ impl MerkleManager {
         debug!("revert merkle tree {}", tx_seq);
         // Special case for reverting tx_seq == 0
         if tx_seq == u64::MAX {
-            self.pora_chunks_merkle.reset();
-            self.last_chunk_merkle.reset();
+            self.pora_chunks_merkle.reset()?;
+            self.last_chunk_merkle.reset()?;
             return Ok(());
         }
         let old_leaves = self.pora_chunks_merkle.leaves();
@@ -129,9 +129,9 @@ impl MerkleManager {
     fn try_initialize(&mut self, flow_store: &FlowStore) -> Result<()> {
         if self.pora_chunks_merkle.leaves() == 0 && self.last_chunk_merkle.leaves() == 0 {
             self.last_chunk_merkle
-                .append(OptionalHash::some(H256::zero()));
+                .append(OptionalHash::some(H256::zero()))?;
             self.pora_chunks_merkle
-                .update_last(self.last_chunk_merkle.root());
+                .update_last(self.last_chunk_merkle.root())?;
         } else if self.last_chunk_merkle.leaves() != 0 {
             let last_chunk_start_index = self.last_chunk_start_index();
             let last_chunk_data = flow_store.get_available_entries(
@@ -150,7 +150,7 @@ impl MerkleManager {
                     self.last_chunk_merkle.fill_leaf(
                         index,
                         Sha3Algorithm::leaf(&e.data[i * ENTRY_SIZE..(i + 1) * ENTRY_SIZE]),
-                    );
+                    )?;
                 }
             }
         }
@@ -808,7 +808,7 @@ impl LogManager {
             }
             // Initialize
             None => {
-                pora_chunks_merkle.reset();
+                pora_chunks_merkle.reset()?;
                 Merkle::new_with_depth(vec![], 1, None)
             }
         };
@@ -820,7 +820,7 @@ impl LogManager {
             last_chunk_merkle.leaves(),
         );
         if last_chunk_merkle.leaves() != 0 {
-            pora_chunks_merkle.update_last(last_chunk_merkle.root());
+            pora_chunks_merkle.update_last(last_chunk_merkle.root())?;
         }
         // update the merkle root
         pora_chunks_merkle.commit(start_tx_seq);
@@ -943,7 +943,7 @@ impl LogManager {
                 } else {
                     merkle
                         .pora_chunks_merkle
-                        .update_last(merkle.last_chunk_merkle.root());
+                        .update_last(merkle.last_chunk_merkle.root())?;
                 }
                 if merkle.last_chunk_merkle.leaves() == PORA_CHUNK_SIZE {
                     self.complete_last_chunk_merkle(
@@ -995,26 +995,26 @@ impl LogManager {
                 if pad_data.len() < last_chunk_pad {
                     is_full_empty = false;
                     let pad_leaves = data_to_merkle_leaves(&pad_data)?;
-                    merkle.last_chunk_merkle.append_list(pad_leaves);
+                    merkle.last_chunk_merkle.append_list(pad_leaves)?;
                     merkle
                         .pora_chunks_merkle
-                        .update_last(merkle.last_chunk_merkle.root());
+                        .update_last(merkle.last_chunk_merkle.root())?;
                 } else {
                     if last_chunk_pad != 0 {
                         is_full_empty = false;
                         // Pad the last chunk.
                         let last_chunk_leaves = data_to_merkle_leaves(&pad_data[..last_chunk_pad])?;
-                        merkle.last_chunk_merkle.append_list(last_chunk_leaves);
+                        merkle.last_chunk_merkle.append_list(last_chunk_leaves)?;
                         merkle
                             .pora_chunks_merkle
-                            .update_last(merkle.last_chunk_merkle.root());
+                            .update_last(merkle.last_chunk_merkle.root())?;
                         completed_chunk_index = Some(merkle.pora_chunks_merkle.leaves() - 1);
                     }
 
                     // Pad with more complete chunks.
                     let mut start_index = last_chunk_pad / ENTRY_SIZE;
                     while pad_data.len() >= (start_index + PORA_CHUNK_SIZE) * ENTRY_SIZE {
-                        merkle.pora_chunks_merkle.append(PAD_SEGMENT_ROOT.clone());
+                        merkle.pora_chunks_merkle.append(PAD_SEGMENT_ROOT.clone())?;
                         start_index += PORA_CHUNK_SIZE;
                     }
                     assert_eq!(pad_data.len(), start_index * ENTRY_SIZE);
@@ -1088,11 +1088,11 @@ impl LogManager {
             {
                 merkle
                     .last_chunk_merkle
-                    .fill_leaf(chunk_start_index + local_index, Sha3Algorithm::leaf(entry));
+                    .fill_leaf(chunk_start_index + local_index, Sha3Algorithm::leaf(entry))?;
             }
             merkle
                 .pora_chunks_merkle
-                .update_last(merkle.last_chunk_merkle.root());
+                .update_last(merkle.last_chunk_merkle.root())?;
         }
 
         let chunk_roots = self.flow_store.append_entries(flow_entry_array)?;
@@ -1105,7 +1105,7 @@ impl LogManager {
             if chunk_index < merkle.pora_chunks_merkle.leaves() as u64 {
                 merkle
                     .pora_chunks_merkle
-                    .fill_leaf(chunk_index as usize, OptionalHash::some(chunk_root));
+                    .fill_leaf(chunk_index as usize, OptionalHash::some(chunk_root))?;
             } else {
                 // TODO(zz): This assumption may be false in the future.
                 unreachable!("We always insert tx nodes before put_chunks");
