@@ -54,7 +54,9 @@ impl ZgsConfig {
             network_config.enr_tcp_port = Some(self.network_enr_tcp_port);
             network_config.enr_udp_port = Some(self.network_enr_udp_port);
             network_config.enr_address = match &self.network_enr_address {
-                Some(addr) => Some(addr.parse().unwrap()),
+                Some(addr) => Some(addr.parse().map_err(|e| {
+                    format!("Invalid network_enr_address {:?}: {:?}", addr, e)
+                })?),
                 None => match public_ip::addr_v4().await {
                     Some(ipv4_addr) => {
                         info!(?ipv4_addr, "Auto detect public IP as ENR address");
@@ -218,7 +220,9 @@ impl ZgsConfig {
 
         if router_config.public_address.is_none() {
             if let Some(addr) = &self.network_enr_address {
-                router_config.public_address = Some(addr.parse().unwrap());
+                router_config.public_address = Some(addr.parse().map_err(|e| {
+                    format!("Invalid network_enr_address {:?}: {:?}", addr, e)
+                })?);
             }
         }
 
