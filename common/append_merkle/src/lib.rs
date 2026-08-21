@@ -898,12 +898,16 @@ mod tests {
                 0,
                 None,
             );
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
+            merkle
+                .append_list(data.clone().into_iter().map(OptionalHash::some).collect())
+                .unwrap();
             merkle.commit(Some(0));
             verify(&data, &mut merkle);
 
             data.push(H256::random());
-            merkle.append(OptionalHash::some(*data.last().unwrap())).unwrap();
+            merkle
+                .append(OptionalHash::some(*data.last().unwrap()))
+                .unwrap();
             merkle.commit(Some(1));
             verify(&data, &mut merkle);
 
@@ -937,7 +941,9 @@ mod tests {
                 0,
                 None,
             );
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
+            merkle
+                .append_list(data.clone().into_iter().map(OptionalHash::some).collect())
+                .unwrap();
             merkle.commit(Some(0));
 
             for i in (0..data.len()).step_by(6) {
@@ -977,7 +983,9 @@ mod tests {
             for _ in 0..entry_len {
                 data.push(H256::random());
             }
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
+            merkle
+                .append_list(data.clone().into_iter().map(OptionalHash::some).collect())
+                .unwrap();
             merkle.commit(Some(tx_seq as u64));
             for i in (0..data.len()).step_by(6) {
                 let end = std::cmp::min(start_pos + i + 3, data.len());
