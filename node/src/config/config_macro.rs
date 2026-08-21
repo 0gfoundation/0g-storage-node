@@ -42,6 +42,11 @@ macro_rules! build_config{
         }
 
         impl RawConfiguration {
+            /// Every field name declared above. `parse` reads CLI values by the hyphenated
+            /// form of these, so tests can use this to check that each registered clap arg
+            /// id actually resolves to a field.
+            pub const FIELD_NAMES: &'static [&'static str] = &[$(stringify!($name),)*];
+
             // First parse arguments from config file, and then parse them from command line.
             // Replace the ones from config file with the ones from commandline for duplicates.
             pub fn parse(matches: &clap::ArgMatches) -> Result<RawConfiguration, String> {

@@ -26,4 +26,4 @@ CMD zgs_node \
     --miner-key "${STORAGE_MINER_PRIVATE_KEY:?missing STORAGE_MINER_PRIVATE_KEY}" \
     --blockchain-rpc-endpoint "${STORAGE_BLOCKCHAIN_RPC_ENDPOINT:?missing STORAGE_BLOCKCHAIN_RPC_ENDPOINT}" \
     --network-enr-address "${STORAGE_ENR_ADDRESS:?missing STORAGE_ENR_ADDRESS}" \
-    --db-max-num-chunks "${STORAGE_DB_MAX_NUM_SECTORS:-8000000000}"
+    --db-max-num-sectors "${STORAGE_DB_MAX_NUM_SECTORS:-4000000000}"
