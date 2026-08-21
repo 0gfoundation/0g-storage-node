@@ -28,6 +28,19 @@ use crate::metrics::{self, PubsubMsgHandleMetrics};
 use crate::peer_manager::PeerManager;
 use crate::Config;
 
+/// Largest `tx_ids` list accepted in a single received AnnounceFile.
+///
+/// This is a protocol limit, not a tuning knob, so it is deliberately not configurable:
+/// rejecting a message also stops its propagation and scores the sender down, so nodes
+/// disagreeing on the threshold would penalise honest peers and make propagation
+/// non-deterministic. It sits alongside `GOSSIP_MAX_SIZE_POST_MERGE`, the only other bound
+/// on this field, which is a const for the same reason. Changing it means a coordinated
+/// network upgrade.
+///
+/// 256 leaves a 25x margin over `batcher_file_capacity = 10` in the shipped configs, and
+/// caps the quadratic `FileLocationCache::insert` cost at roughly 2.6 MB per message.
+pub const MAX_ANNOUNCE_FILE_TX_IDS: usize = 256;
+
 lazy_static::lazy_static! {
     /// Timeout to publish message to neighbor nodes.
     pub static ref PUBSUB_TIMEOUT_NEIGHBORS: chrono::Duration = chrono::Duration::seconds(30);
@@ -790,11 +803,11 @@ impl Libp2pEventHandler {
         // channel, and `tx_ids` is otherwise limited only by the 10 MB decompressed gossip
         // cap - roughly 262k entries, none of which the per-peer rate limiter counts, since
         // it meters messages rather than their contents.
-        if msg.tx_ids.len() > self.config.max_announce_file_tx_ids {
+        if msg.tx_ids.len() > MAX_ANNOUNCE_FILE_TX_IDS {
             debug!(
                 %propagation_source,
                 tx_ids = msg.tx_ids.len(),
-                limit = self.config.max_announce_file_tx_ids,
+                limit = MAX_ANNOUNCE_FILE_TX_IDS,
                 "Oversized AnnounceFile, rejecting"
             );
             metrics::LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_OVERSIZED.mark(1);
@@ -1449,8 +1462,7 @@ mod tests {
 
         // One AnnounceFile fans out into one SyncMessage per tx_id, so an unbounded list
         // lets a single gossip message flood the sync channel.
-        let limit = handler.config.max_announce_file_tx_ids;
-        let tx_ids: Vec<_> = (0..limit + 1)
+        let tx_ids: Vec<_> = (0..MAX_ANNOUNCE_FILE_TX_IDS + 1)
             .map(|i| TxID::random_hash(i as u64))
             .collect();
         let message = handler
