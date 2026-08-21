@@ -84,6 +84,7 @@ lazy_static::lazy_static! {
     pub static ref LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_TIMEOUT: Arc<dyn Meter> = register_meter_with_group("router_libp2p_handle_pubsub_announce_file", "timeout");
     pub static ref LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_ANNOUNCEMENTS: Arc<dyn Meter> = register_meter_with_group("router_libp2p_handle_pubsub_announce_file", "announcements");
     pub static ref LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_FILES: Arc<dyn Meter> = register_meter_with_group("router_libp2p_handle_pubsub_announce_file", "files");
+    pub static ref LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_OVERSIZED: Arc<dyn Meter> = register_meter_with_group("router_libp2p_handle_pubsub_announce_file", "oversized");
 
     // libp2p_event_handler: verify IP address
     pub static ref LIBP2P_VERIFY_ANNOUNCED_IP: Arc<dyn Meter> = register_meter("router_libp2p_verify_announced_ip");

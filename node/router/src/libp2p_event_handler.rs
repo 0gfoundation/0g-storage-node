@@ -786,6 +786,27 @@ impl Libp2pEventHandler {
             return MessageAcceptance::Reject;
         }
 
+        // Bound the fan-out below. Every tx_id becomes its own SyncMessage on an unbounded
+        // channel, and `tx_ids` is otherwise limited only by the 10 MB decompressed gossip
+        // cap - roughly 262k entries, none of which the per-peer rate limiter counts, since
+        // it meters messages rather than their contents.
+        if msg.tx_ids.len() > self.config.max_announce_file_tx_ids {
+            debug!(
+                %propagation_source,
+                tx_ids = msg.tx_ids.len(),
+                limit = self.config.max_announce_file_tx_ids,
+                "Oversized AnnounceFile, rejecting"
+            );
+            metrics::LIBP2P_HANDLE_PUBSUB_ANNOUNCE_FILE_OVERSIZED.mark(1);
+            self.send_to_network(NetworkMessage::ReportPeer {
+                peer_id: propagation_source,
+                action: PeerAction::LowToleranceError,
+                source: ReportSource::Gossipsub,
+                msg: "Oversized AnnounceFile tx_ids",
+            });
+            return MessageAcceptance::Reject;
+        }
+
         // verify public ip address if required
         let addr = msg.at.clone().into();
         if !self.config.private_ip_enabled && !Self::contains_public_ip(&addr) {
@@ -1416,6 +1437,33 @@ mod tests {
         // failed to verify signature
         let result = handler.on_pubsub_message(alice, bob, &id, message).await;
         assert!(matches!(result, MessageAcceptance::Reject));
+    }
+
+    #[tokio::test]
+    async fn test_on_pubsub_announce_file_oversized_tx_ids() {
+        let mut ctx = Context::default();
+        let handler = ctx.new_handler();
+
+        let (alice, bob) = (PeerId::random(), PeerId::random());
+        let id = MessageId::new(b"dummy message");
+
+        // One AnnounceFile fans out into one SyncMessage per tx_id, so an unbounded list
+        // lets a single gossip message flood the sync channel.
+        let limit = handler.config.max_announce_file_tx_ids;
+        let tx_ids: Vec<_> = (0..limit + 1)
+            .map(|i| TxID::random_hash(i as u64))
+            .collect();
+        let message = handler
+            .construct_announce_file_message(tx_ids)
+            .await
+            .unwrap();
+        let message = PubsubMessage::AnnounceFile(vec![message]);
+
+        let result = handler.on_pubsub_message(alice, bob, &id, message).await;
+        assert!(matches!(result, MessageAcceptance::Reject));
+
+        // nothing reached the sync layer
+        assert!(ctx.sync_recv.try_recv().is_err());
     }
 
     #[tokio::test]
