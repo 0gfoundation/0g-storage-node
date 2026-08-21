@@ -37,6 +37,14 @@ pub struct Config {
     pub batcher_file_capacity: usize,
     /// Number of announcements in a pubsub message
     pub batcher_announcement_capacity: usize,
+
+    /// Largest `tx_ids` list accepted in a single received AnnounceFile.
+    ///
+    /// Each entry fans out into its own `SyncMessage::AnnounceFileGossip`, so this bounds
+    /// how much one gossip message can enqueue on the sync channel. Senders bound their own
+    /// lists with `batcher_file_capacity` (shipped configs use 10); anything far above that
+    /// is not honest traffic. Raise it only if peers legitimately batch more.
+    pub max_announce_file_tx_ids: usize,
 }
 
 impl Default for Config {
@@ -54,6 +62,7 @@ impl Default for Config {
             batcher_timeout: Duration::from_secs(1),
             batcher_file_capacity: 1,
             batcher_announcement_capacity: 1,
+            max_announce_file_tx_ids: 256,
         }
     }
 }
