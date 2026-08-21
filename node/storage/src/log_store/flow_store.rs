@@ -376,11 +376,16 @@ impl FlowSeal for FlowStore {
 
         debug!("Seal chunks: indices = {:?}", removed_seal_index);
 
+        // Persist before dequeuing. `to_seal_set` is in-memory only and nothing rescans for
+        // unsealed batches at startup, so an index dropped here is never re-queued: the data
+        // stays unsealed for good and `Miner::iteration` skips it, since `load_sealed_data`
+        // only marks a seal available once `get_sealed_data` returns Some. The write lock is
+        // held across both, so no puller can observe the sealed-but-still-queued window.
+        self.data_db.put_entry_raw(updated_chunk)?;
+
         for idx in removed_seal_index.into_iter() {
             to_seal_set.remove(&idx);
         }
-
-        self.data_db.put_entry_raw(updated_chunk)?;
 
         Ok(())
     }
