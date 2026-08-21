@@ -45,6 +45,7 @@ macro_rules! build_config{
             /// Every field name declared above. `parse` reads CLI values by the hyphenated
             /// form of these, so tests can use this to check that each registered clap arg
             /// id actually resolves to a field.
+            #[cfg(test)]
             pub const FIELD_NAMES: &'static [&'static str] = &[$(stringify!($name),)*];
 
             // First parse arguments from config file, and then parse them from command line.
