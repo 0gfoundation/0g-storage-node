@@ -424,7 +424,7 @@ impl TransactionStore {
             if merkle.leaves() % first_subtree != 0 {
                 let pad_len =
                     cmp::min(first_subtree, PORA_CHUNK_SIZE) - (merkle.leaves() % first_subtree);
-                merkle.append_list(data_to_merkle_leaves(&LogManager::padding_raw(pad_len))?);
+                merkle.append_list(data_to_merkle_leaves(&LogManager::padding_raw(pad_len))?)?;
             }
             // Convert H256 to OptionalHash for append_subtree_list
             let subtree_list_optional_hash = subtree_list

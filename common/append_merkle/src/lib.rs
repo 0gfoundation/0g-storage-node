@@ -15,6 +15,11 @@ use std::time::Instant;
 use tracing::{trace, warn};
 
 use crate::merkle_tree::MerkleTreeWrite;
+
+/// `NodeManager::new_dummy` is backed by `EmptyNodeDatabase`, whose `commit` is a no-op
+/// that always returns `Ok(())`. These trees keep no persistent state, so there is no
+/// failure for the caller to handle.
+const DUMMY_COMMIT_INFALLIBLE: &str = "dummy node manager commit cannot fail";
 pub use crate::merkle_tree::{
     Algorithm, HashElement, MerkleTreeInitialData, MerkleTreeRead, OptionalHash, ZERO_HASHES,
 };
@@ -133,12 +138,12 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                     },
                 );
             }
-            merkle.node_manager.commit();
+            merkle.node_manager.commit().expect(DUMMY_COMMIT_INFALLIBLE);
             return merkle;
         }
         // Reconstruct the whole tree.
         merkle.recompute(0, 0, None);
-        merkle.node_manager.commit();
+        merkle.node_manager.commit().expect(DUMMY_COMMIT_INFALLIBLE);
         // Commit the first version in memory.
         // TODO(zz): Check when the roots become available.
         merkle.commit(start_tx_seq);
@@ -161,7 +166,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         if merkle.height() == 0 {
             merkle.node_manager.start_transaction();
             merkle.node_manager.add_layer();
-            merkle.node_manager.commit();
+            merkle.node_manager.commit()?;
         }
         Ok(merkle)
     }
@@ -192,7 +197,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                     },
                 );
             }
-            merkle.node_manager.commit();
+            merkle.node_manager.commit().expect(DUMMY_COMMIT_INFALLIBLE);
             merkle
         } else {
             let mut merkle = Self {
@@ -211,39 +216,41 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             }
             // Reconstruct the whole tree.
             merkle.recompute(0, 0, None);
-            merkle.node_manager.commit();
+            merkle.node_manager.commit().expect(DUMMY_COMMIT_INFALLIBLE);
             // Commit the first version in memory.
             merkle.commit(start_tx_seq);
             merkle
         }
     }
 
-    pub fn append(&mut self, new_leaf: E) {
+    pub fn append(&mut self, new_leaf: E) -> Result<()> {
         let start_time = Instant::now();
         if new_leaf.is_null() {
             // appending null is not allowed.
-            return;
+            return Ok(());
         }
         self.node_manager.start_transaction();
         self.node_manager.push_node(0, new_leaf);
         self.recompute_after_append_leaves(self.leaves() - 1);
 
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         metrics::APPEND.update_since(start_time);
+        Ok(())
     }
 
-    pub fn append_list(&mut self, leaf_list: Vec<E>) {
+    pub fn append_list(&mut self, leaf_list: Vec<E>) -> Result<()> {
         let start_time = Instant::now();
         if leaf_list.iter().any(|leaf| leaf.is_null()) {
             // appending null is not allowed.
-            return;
+            return Ok(());
         }
         self.node_manager.start_transaction();
         let start_index = self.leaves();
         self.node_manager.append_nodes(0, &leaf_list);
         self.recompute_after_append_leaves(start_index);
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         metrics::APPEND_LIST.update_since(start_time);
+        Ok(())
     }
 
     /// Append a leaf list by providing their intermediate node hash.
@@ -261,7 +268,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         let start_index = self.leaves();
         self.append_subtree_inner(subtree_depth, subtree_root)?;
         self.recompute_after_append_subtree(start_index, subtree_depth - 1);
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         metrics::APPEND_SUBTREE.update_since(start_time);
 
         Ok(())
@@ -279,7 +286,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             self.append_subtree_inner(subtree_depth, subtree_root)?;
             self.recompute_after_append_subtree(start_index, subtree_depth - 1);
         }
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         metrics::APPEND_SUBTREE_LIST.update_since(start_time);
 
         Ok(())
@@ -287,11 +294,11 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
 
     /// Change the value of the last leaf and return the new merkle root.
     /// This is needed if our merkle-tree in memory only keeps intermediate nodes instead of real leaves.
-    pub fn update_last(&mut self, updated_leaf: E) {
+    pub fn update_last(&mut self, updated_leaf: E) -> Result<()> {
         let start_time = Instant::now();
         if updated_leaf.is_null() {
             // updating to null is not allowed.
-            return;
+            return Ok(());
         }
         self.node_manager.start_transaction();
         if self.layer_len(0) == 0 {
@@ -301,21 +308,22 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             self.update_node(0, self.layer_len(0) - 1, updated_leaf);
         }
         self.recompute_after_append_leaves(self.leaves() - 1);
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         metrics::UPDATE_LAST.update_since(start_time);
+        Ok(())
     }
 
     /// Fill an unknown `null` leaf with its real value.
     /// Panics if the leaf is already set and different or the index is out of range.
     /// TODO: Batch computing intermediate nodes.
-    pub fn fill_leaf(&mut self, index: usize, leaf: E) {
+    pub fn fill_leaf(&mut self, index: usize, leaf: E) -> Result<()> {
         if leaf.is_null() {
             // fill leaf with null is not allowed.
         } else if self.node(0, index).is_null() {
             self.node_manager.start_transaction();
             self.update_node(0, index, leaf);
             self.recompute_after_fill_leaves(index, index + 1);
-            self.node_manager.commit();
+            self.node_manager.commit()?;
         } else if self.node(0, index) != leaf {
             panic!(
                 "Fill with invalid leaf, index={} was={:?} get={:?}",
@@ -324,6 +332,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
                 leaf
             );
         }
+        Ok(())
     }
 
     /// Fill nodes with a valid proof data.
@@ -346,7 +355,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             updated_nodes
                 .append(&mut self.fill_with_proof(right_nodes.split_off(self.leaf_height))?);
         }
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         Ok(updated_nodes)
     }
 
@@ -380,7 +389,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             *position += start_index >> i;
         }
         let updated_nodes = self.fill_with_proof(position_and_data)?;
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         Ok(updated_nodes)
     }
 
@@ -656,7 +665,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             self.update_node(height, *last_index, right_most_node.clone())
         }
         self.clear_after(tx_seq);
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         Ok(())
     }
 
@@ -673,7 +682,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
             }
         }
         self.recompute_after_append_leaves(leaves);
-        self.node_manager.commit();
+        self.node_manager.commit()?;
         Ok(())
     }
 
@@ -699,7 +708,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         })
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> Result<()> {
         self.node_manager.start_transaction();
         for height in (0..self.height()).rev() {
             self.node_manager.truncate_layer(height);
@@ -711,7 +720,7 @@ impl<E: HashElement, A: Algorithm<E>> AppendMerkleTree<E, A> {
         } else {
             self.node_manager.add_layer();
         }
-        self.node_manager.commit();
+        self.node_manager.commit()
     }
 
     fn clear_after(&mut self, tx_seq: u64) {
@@ -889,25 +898,27 @@ mod tests {
                 0,
                 None,
             );
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
             merkle.commit(Some(0));
             verify(&data, &mut merkle);
 
             data.push(H256::random());
-            merkle.append(OptionalHash::some(*data.last().unwrap()));
+            merkle.append(OptionalHash::some(*data.last().unwrap())).unwrap();
             merkle.commit(Some(1));
             verify(&data, &mut merkle);
 
             for _ in 0..6 {
                 data.push(H256::random());
             }
-            merkle.append_list(
-                data[data.len() - 6..]
-                    .iter()
-                    .copied()
-                    .map(OptionalHash::some)
-                    .collect(),
-            );
+            merkle
+                .append_list(
+                    data[data.len() - 6..]
+                        .iter()
+                        .copied()
+                        .map(OptionalHash::some)
+                        .collect(),
+                )
+                .unwrap();
             merkle.commit(Some(2));
             verify(&data, &mut merkle);
         }
@@ -926,7 +937,7 @@ mod tests {
                 0,
                 None,
             );
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
             merkle.commit(Some(0));
 
             for i in (0..data.len()).step_by(6) {
@@ -936,7 +947,7 @@ mod tests {
                 for _ in 0..3 {
                     new_data.push(OptionalHash::some(H256::random()));
                 }
-                merkle.append_list(new_data);
+                merkle.append_list(new_data).unwrap();
                 let seq = i as u64 / 6 + 1;
                 merkle.commit(Some(seq));
                 let optional_data: Vec<OptionalHash> = data[i..end]
@@ -966,7 +977,7 @@ mod tests {
             for _ in 0..entry_len {
                 data.push(H256::random());
             }
-            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect());
+            merkle.append_list(data.clone().into_iter().map(OptionalHash::some).collect()).unwrap();
             merkle.commit(Some(tx_seq as u64));
             for i in (0..data.len()).step_by(6) {
                 let end = std::cmp::min(start_pos + i + 3, data.len());

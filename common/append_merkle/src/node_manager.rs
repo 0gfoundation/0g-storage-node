@@ -122,17 +122,15 @@ impl<E: HashElement> NodeManager<E> {
         self.db_tx = Some(self.db.start_transaction());
     }
 
-    pub fn commit(&mut self) {
+    pub fn commit(&mut self) -> Result<()> {
         let tx = match self.db_tx.take() {
             Some(tx) => tx,
             None => {
                 error!("db_tx is None");
-                return;
+                return Ok(());
             }
         };
-        if let Err(e) = self.db.commit(tx) {
-            error!("Failed to commit db transaction: {}", e);
-        }
+        self.db.commit(tx)
     }
 
     fn db_tx(&mut self) -> &mut dyn NodeTransaction<E> {

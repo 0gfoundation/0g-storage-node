@@ -28,11 +28,11 @@ fn test_put_get() {
         None,
     );
     let padding_leaves = data_to_merkle_leaves(&LogManager::padding_raw(start_offset - 1)).unwrap();
-    merkle.append_list(padding_leaves);
+    merkle.append_list(padding_leaves).unwrap();
     let mut data_padded = data.clone();
     data_padded.append(&mut vec![0u8; CHUNK_SIZE]);
     let data_leaves = data_to_merkle_leaves(&data_padded).unwrap();
-    merkle.append_list(data_leaves);
+    merkle.append_list(data_leaves).unwrap();
     merkle.commit(Some(0));
     let tx_merkle = sub_merkle_tree(&data).unwrap();
     let tx = Transaction {

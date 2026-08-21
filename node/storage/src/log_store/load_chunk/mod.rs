@@ -400,7 +400,7 @@ impl EntryBatch {
                 let leaf_data = try_option!(
                     self.get_unsealed_data(merkle.leaves(), subtree.start_sector - merkle.leaves())
                 );
-                merkle.append_list(data_to_merkle_leaves(&leaf_data).expect("aligned"));
+                merkle.append_list(data_to_merkle_leaves(&leaf_data).expect("aligned"))?;
             }
             merkle.append_subtree(subtree.subtree_height, subtree.root.into())?;
         }
@@ -408,13 +408,13 @@ impl EntryBatch {
             let leaf_data = try_option!(
                 self.get_unsealed_data(merkle.leaves(), SECTORS_PER_LOAD - merkle.leaves())
             );
-            merkle.append_list(data_to_merkle_leaves(&leaf_data).expect("aligned"));
+            merkle.append_list(data_to_merkle_leaves(&leaf_data).expect("aligned"))?;
         }
         // TODO(zz): Optimize.
         for index in 0..merkle.leaves() {
             if merkle.leaf_at(index)?.is_none() {
                 if let Some(leaf_data) = self.get_unsealed_data(index, 1) {
-                    merkle.fill_leaf(index, Sha3Algorithm::leaf(&leaf_data));
+                    merkle.fill_leaf(index, Sha3Algorithm::leaf(&leaf_data))?;
                 }
             }
         }
