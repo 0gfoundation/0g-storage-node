@@ -173,9 +173,22 @@ where
                         gas_price = std::cmp::min(new_price, max_gp);
                         debug!("Bumping gas price to {}", gas_price);
                     } else {
-                        // No maxGasPrice => we do NOT bump => fail
-                        return Err(
-                            "Mempool/timeout error, no maxGasPrice set => aborting".to_string()
+                        // No maxGasPrice => we must not bump the gas price, but the
+                        // submission is still worth retrying at the current price. A tx
+                        // dropped from the mempool, or a receipt that never arrived, is
+                        // usually transient; aborting here discarded the submission on the
+                        // first flake. Share the non-gas counter so total attempts stay
+                        // bounded by max_retries either way.
+                        non_gas_retries += 1;
+                        if non_gas_retries > max_retries {
+                            return Err(format!(
+                                "Exceeded retries: {}, no maxGasPrice set to bump gas, last error: {}",
+                                max_retries, error_str
+                            ));
+                        }
+                        debug!(
+                            "Mempool/timeout retry #{} without gas bump (no maxGasPrice set, gas price: {})",
+                            non_gas_retries, gas_price
                         );
                     }
                 } else {
