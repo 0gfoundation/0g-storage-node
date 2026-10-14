@@ -21,6 +21,7 @@ use admin::RpcServer as AdminRpcServer;
 use chunk_pool::MemoryChunkPool;
 use file_location_cache::FileLocationCache;
 use futures::channel::mpsc::Sender;
+use jsonrpsee::core::server::rpc_module::Methods;
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 use network::{NetworkGlobals, NetworkMessage, NetworkSender};
@@ -92,10 +93,10 @@ pub async fn run_server(
     Ok(handles)
 }
 
-fn server_builder(ctx: Context) -> HttpServerBuilder<middleware::Metrics> {
+fn server_builder(ctx: Context, methods: &Methods) -> HttpServerBuilder<middleware::Metrics> {
     HttpServerBuilder::default()
         .max_request_body_size(ctx.config.max_request_body_size)
-        .set_middleware(middleware::Metrics::default())
+        .set_middleware(middleware::Metrics::new(methods))
 }
 
 /// Run a single RPC server for all namespace RPCs.
@@ -113,7 +114,7 @@ async fn run_server_all(ctx: Context) -> Result<HttpServerHandle, Box<dyn Error>
         zgs.merge(mine)?;
     }
 
-    Ok(server_builder(ctx.clone())
+    Ok(server_builder(ctx.clone(), &zgs)
         .build(ctx.config.listen_address)
         .await?
         .start(zgs)?)
@@ -135,12 +136,12 @@ async fn run_server_public_private(
         admin.merge(mine)?;
     }
 
-    let handle_public = server_builder(ctx.clone())
+    let handle_public = server_builder(ctx.clone(), &zgs)
         .build(ctx.config.listen_address)
         .await?
         .start(zgs)?;
 
-    let handle_private = server_builder(ctx.clone())
+    let handle_private = server_builder(ctx.clone(), &admin)
         .build(ctx.config.listen_address_admin)
         .await?
         .start(admin)?;
