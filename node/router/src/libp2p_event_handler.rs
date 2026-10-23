@@ -645,9 +645,9 @@ impl Libp2pEventHandler {
         }
 
         // try from cache
-        if let Some(mut msg) = self.file_location_cache.get_one(tx_id) {
+        if let Some(msg_arc) = self.file_location_cache.get_one(tx_id) {
             trace!(?tx_id, "Found file in cache, responding to FindFile query");
-
+            let mut msg = (*msg_arc).clone();
             msg.resend_timestamp = timestamp_now();
             self.publish_announcement(msg).await;
 
