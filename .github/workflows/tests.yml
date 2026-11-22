@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # librocksdb-sys 0.11 (RocksDB 8.1.1) does not build with GCC 15 (Ubuntu 26.04) without this
+  CXXFLAGS: "-include cstdint"
 
 jobs:
   test:
