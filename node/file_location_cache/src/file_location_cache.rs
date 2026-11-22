@@ -29,7 +29,7 @@ struct AnnouncementCache {
 
     /// All cached announcements that mapped from peer id to announcement.
     /// Note, only cache the latest announcement for each peer.
-    items: HashMap<PeerId, SignedAnnounceFile>,
+    items: HashMap<PeerId, Arc<SignedAnnounceFile>>,
 
     /// All announcements are prioritized by timestamp.
     /// The top element is the oldest announcement.
@@ -55,7 +55,7 @@ impl AnnouncementCache {
     }
 
     /// Removes the oldest announcement if any.
-    fn pop(&mut self) -> Option<SignedAnnounceFile> {
+    fn pop(&mut self) -> Option<Arc<SignedAnnounceFile>> {
         let (peer_id, _) = self.priorities.pop()?;
         self.items.remove(&peer_id)
     }
@@ -81,7 +81,7 @@ impl AnnouncementCache {
         collected
     }
 
-    fn do_insert_or_update(&mut self, announcement: SignedAnnounceFile) {
+    fn do_insert_or_update(&mut self, announcement: Arc<SignedAnnounceFile>) {
         let peer_id = announcement.peer_id.clone().into();
         self.priorities
             .push(peer_id, Reverse(announcement.timestamp));
@@ -89,7 +89,7 @@ impl AnnouncementCache {
     }
 
     /// Insert the specified `announcement` into cache.
-    fn insert(&mut self, announcement: SignedAnnounceFile) {
+    fn insert(&mut self, announcement: Arc<SignedAnnounceFile>) {
         self.garbage_collect();
 
         let peer_id = announcement.peer_id.clone().into();
@@ -111,7 +111,7 @@ impl AnnouncementCache {
     }
 
     /// Randomly pick an announcement if any.
-    fn random(&mut self) -> (Option<SignedAnnounceFile>, usize) {
+    fn random(&mut self) -> (Option<Arc<SignedAnnounceFile>>, usize) {
         let collected = self.garbage_collect();
 
         // all announcements garbage collected
@@ -123,20 +123,20 @@ impl AnnouncementCache {
             .items
             .iter()
             .choose(&mut rand::thread_rng())
-            .map(|(_, item)| item.clone());
+            .map(|(_, item)| Arc::clone(item));
 
         (choosed, collected)
     }
 
     /// Returns all announcements.
-    fn all(&mut self) -> (Vec<SignedAnnounceFile>, usize) {
+    fn all(&mut self) -> (Vec<Arc<SignedAnnounceFile>>, usize) {
         let collected = self.garbage_collect();
-        let result = self.items.values().cloned().collect();
+        let result = self.items.values().map(Arc::clone).collect();
         (result, collected)
     }
 
     /// Removes announcement for the specified `peer_id` if any.
-    fn remove(&mut self, peer_id: &PeerId) -> Option<SignedAnnounceFile> {
+    fn remove(&mut self, peer_id: &PeerId) -> Option<Arc<SignedAnnounceFile>> {
         self.priorities.remove(peer_id)?;
         self.items.remove(peer_id)
     }
@@ -169,7 +169,7 @@ impl FileCache {
     }
 
     /// Insert the specified `announcement` into cache.
-    fn insert(&mut self, tx_id: TxID, announcement: SignedAnnounceFile) {
+    fn insert(&mut self, tx_id: TxID, announcement: Arc<SignedAnnounceFile>) {
         let item = self.files.entry(tx_id).or_insert_with(|| {
             AnnouncementCache::new(
                 self.config.max_entries_per_file,
@@ -193,7 +193,7 @@ impl FileCache {
     }
 
     /// Removes the oldest file announcement.
-    fn pop(&mut self) -> Option<SignedAnnounceFile> {
+    fn pop(&mut self) -> Option<Arc<SignedAnnounceFile>> {
         let (&tx_id, _) = self.priorities.peek()?;
         let item = self.files.get_mut(&tx_id)?;
 
@@ -205,7 +205,7 @@ impl FileCache {
     }
 
     /// Randomly pick a announcement of specified file by `tx_id`.
-    fn random(&mut self, tx_id: TxID) -> Option<SignedAnnounceFile> {
+    fn random(&mut self, tx_id: TxID) -> Option<Arc<SignedAnnounceFile>> {
         let item = self.files.get_mut(&tx_id)?;
         let (result, collected) = item.random();
         self.update_on_announcement_cache_changed(&tx_id, collected);
@@ -237,7 +237,7 @@ impl FileCache {
     }
 
     /// Returns all the announcements of specified file by `tx_id`.
-    fn all(&mut self, tx_id: TxID) -> Option<Vec<SignedAnnounceFile>> {
+    fn all(&mut self, tx_id: TxID) -> Option<Vec<Arc<SignedAnnounceFile>>> {
         let item = self.files.get_mut(&tx_id)?;
         let (result, collected) = item.all();
         self.update_on_announcement_cache_changed(&tx_id, collected);
@@ -246,7 +246,7 @@ impl FileCache {
     }
 
     /// Removes the announcement of specified file by `tx_id` and `peer_id`.
-    fn remove(&mut self, tx_id: &TxID, peer_id: &PeerId) -> Option<SignedAnnounceFile> {
+    fn remove(&mut self, tx_id: &TxID, peer_id: &PeerId) -> Option<Arc<SignedAnnounceFile>> {
         let item = self.files.get_mut(tx_id)?;
         let result = item.remove(peer_id)?;
         self.update_on_announcement_cache_changed(tx_id, 1);
@@ -303,23 +303,26 @@ impl FileLocationCache {
         };
         self.insert_peer_config(peer_id, shard_config);
 
+        // Share the single heap allocation for all tx_ids via Arc
+        let shared_announcement = Arc::new(announcement);
+
         let mut cache = self.cache.lock();
-        for tx_id in announcement.tx_ids.iter() {
-            cache.insert(*tx_id, announcement.clone());
+        for tx_id in shared_announcement.tx_ids.iter() {
+            cache.insert(*tx_id, Arc::clone(&shared_announcement));
         }
 
         TOTAL_CACHED.update(cache.total_announcements as u64);
     }
 
-    pub fn get_one(&self, tx_id: TxID) -> Option<SignedAnnounceFile> {
+    pub fn get_one(&self, tx_id: TxID) -> Option<Arc<SignedAnnounceFile>> {
         self.cache.lock().random(tx_id)
     }
 
-    pub fn get_all(&self, tx_id: TxID) -> Vec<SignedAnnounceFile> {
+    pub fn get_all(&self, tx_id: TxID) -> Vec<Arc<SignedAnnounceFile>> {
         self.cache.lock().all(tx_id).unwrap_or_default()
     }
 
-    pub fn remove(&self, tx_id: &TxID, peer_id: &PeerId) -> Option<SignedAnnounceFile> {
+    pub fn remove(&self, tx_id: &TxID, peer_id: &PeerId) -> Option<Arc<SignedAnnounceFile>> {
         self.cache.lock().remove(tx_id, peer_id)
     }
 
@@ -340,6 +343,7 @@ impl FileLocationCache {
 #[cfg(test)]
 mod tests {
     use std::cmp::Reverse;
+    use std::sync::Arc;
 
     use network::{types::SignedAnnounceFile, PeerId};
     use shared_types::{timestamp_now, TxID};
@@ -348,13 +352,14 @@ mod tests {
 
     use super::{AnnouncementCache, FileCache};
 
-    fn create_file(peer_id: Option<PeerId>, timestamp: u32) -> SignedAnnounceFile {
+    fn create_file(peer_id: Option<PeerId>, timestamp: u32) -> Arc<SignedAnnounceFile> {
         let builder = AnnounceFileBuilder::default().with_timestamp(timestamp);
-        if let Some(id) = peer_id {
+        let file = if let Some(id) = peer_id {
             builder.with_peer_id(id).build()
         } else {
             builder.build()
-        }
+        };
+        Arc::new(file)
     }
 
     #[test]
@@ -387,7 +392,7 @@ mod tests {
         let now = timestamp_now();
 
         // empty by default
-        assert_eq!(cache.pop(), None);
+        assert!(cache.pop().is_none());
         assert_eq!(cache.len(), 0);
 
         cache.insert(create_file(None, now - 2));
@@ -399,7 +404,7 @@ mod tests {
         assert_eq!(cache.pop().unwrap().timestamp, now - 3);
         assert_eq!(cache.pop().unwrap().timestamp, now - 2);
         assert_eq!(cache.pop().unwrap().timestamp, now - 1);
-        assert_eq!(cache.pop(), None);
+        assert!(cache.pop().is_none());
         assert_eq!(cache.len(), 0);
     }
 
@@ -503,7 +508,7 @@ mod tests {
         let mut cache = AnnouncementCache::new(100, 3600);
         let now = timestamp_now();
 
-        assert_eq!(cache.random().0, None);
+        assert!(cache.random().0.is_none());
 
         cache.insert(create_file(None, now - 1));
         assert_eq!(cache.random().0.unwrap().timestamp, now - 1);
@@ -519,7 +524,7 @@ mod tests {
         let mut cache = AnnouncementCache::new(100, 3600);
         let now = timestamp_now();
 
-        assert_eq!(cache.all().0, vec![]);
+        assert!(cache.all().0.is_empty());
 
         cache.insert(create_file(None, now - 1));
         cache.insert(create_file(None, now - 2));
@@ -528,7 +533,7 @@ mod tests {
         assert_all_files(cache.all().0, vec![now - 3, now - 2, now - 1])
     }
 
-    fn assert_all_files(files: Vec<SignedAnnounceFile>, sorted_timestamps: Vec<u32>) {
+    fn assert_all_files(files: Vec<Arc<SignedAnnounceFile>>, sorted_timestamps: Vec<u32>) {
         let mut timestamps: Vec<u32> = files.iter().map(|f| f.timestamp).collect();
         timestamps.sort();
         assert_eq!(timestamps, sorted_timestamps);
@@ -542,12 +547,14 @@ mod tests {
         })
     }
 
-    fn create_file_2(tx_id: TxID, peer_id: PeerId, timestamp: u32) -> SignedAnnounceFile {
-        AnnounceFileBuilder::default()
-            .with_tx_id(tx_id)
-            .with_peer_id(peer_id)
-            .with_timestamp(timestamp)
-            .build()
+    fn create_file_2(tx_id: TxID, peer_id: PeerId, timestamp: u32) -> Arc<SignedAnnounceFile> {
+        Arc::new(
+            AnnounceFileBuilder::default()
+                .with_tx_id(tx_id)
+                .with_peer_id(peer_id)
+                .with_timestamp(timestamp)
+                .build(),
+        )
     }
 
     fn assert_file(file: &SignedAnnounceFile, tx_id: TxID, peer_id: PeerId, timestamp: u32) {
@@ -581,7 +588,7 @@ mod tests {
         assert_eq!(cache.total_announcements, 1);
         assert_file(&cache.pop().unwrap(), tx1, peer1, now - 1);
         assert_eq!(cache.total_announcements, 0);
-        assert_eq!(cache.pop(), None);
+        assert!(cache.pop().is_none());
     }
 
     #[test]
@@ -608,5 +615,25 @@ mod tests {
             cache.all(tx2).unwrap_or_default(),
             vec![now - 3, now - 2, now - 1],
         );
+    }
+
+    #[test]
+    fn test_file_cache_shares_announcement_across_tx_ids() {
+        let mut cache = create_file_cache(100, 3, 3600);
+        let now = timestamp_now();
+
+        let peer_id = PeerId::random();
+        let tx1 = TxID::random_hash(1);
+        let tx2 = TxID::random_hash(2);
+
+        let announcement = create_file_2(tx1, peer_id, now - 1);
+
+        cache.insert(tx1, Arc::clone(&announcement));
+        cache.insert(tx2, Arc::clone(&announcement));
+
+        let first = &cache.files[&tx1].items[&peer_id];
+        let second = &cache.files[&tx2].items[&peer_id];
+
+        assert!(Arc::ptr_eq(first, second));
     }
 }
